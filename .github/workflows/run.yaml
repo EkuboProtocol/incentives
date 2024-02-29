@@ -32,5 +32,5 @@ jobs:
           PGDATABASE: ${{ secrets.POSTGRES_DB }}
           PGUSER: ${{ secrets.POSTGRES_USERNAME }}
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          RUN_DATES: '2024-02-22,2024-02-23,2024-02-24,2024-02-25,2024-02-26,2024-02-27,2024-02-28'
+#          RUN_DATES: '2024-02-22,2024-02-23,2024-02-24,2024-02-25,2024-02-26,2024-02-27,2024-02-28'
         run: npm start
