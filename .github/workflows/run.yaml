@@ -25,13 +25,14 @@ jobs:
         run: |
           export PGPASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
           
-          psql -f ./query.sql \
+          psql --echo-errors -f ./query.sql \
             -o ./result.csv \
             --csv \
             -h ${{ secrets.POSTGRES_HOST }} \
             -p ${{ secrets.POSTGRES_PORT }} \
             -d ${{ secrets.POSTGRES_DB }} \
             -U ${{ secrets.POSTGRES_USERNAME }} \
+            -w \
             -v start="'2023-09-14T00:00:00'" \
             -v end="'2023-09-15T00:00:00'"
 
@@ -39,4 +40,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: result.csv
-          path: ./query.sql
+          path: ./result.csv
