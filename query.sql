@@ -189,13 +189,36 @@ WITH
                                                   salt,
                                                   lower_bound,
                                                   upper_bound,
-                                                  psdp.liquidity,
 
-                                                  (ptc.tick BETWEEN psdp.lower_bound AND (psdp.upper_bound - 1))     AS active,
+                                                  (CASE
+                                                       WHEN ptc.tick < psdp.lower_bound THEN liquidity *
+                                                                                             ((1::NUMERIC / POWER(1.0000005::NUMERIC, lower_bound)) -
+                                                                                              (1::NUMERIC / POWER(1.0000005::NUMERIC, upper_bound)))
+                                                       WHEN ptc.tick < psdp.upper_bound THEN liquidity *
+                                                                                             ((1::NUMERIC / POWER(1.0000005::NUMERIC, ptc.tick)) -
+                                                                                              (1::NUMERIC / POWER(1.0000005::NUMERIC, upper_bound)))
+                                                       ELSE 0 END) *
+                                                      -- todo: this is not an accurate price for the pair, it's just the price for the current pool
+                                                  POWER(1.000001, tick)                                              AS amount0_in_amount1,
+
+                                                  (CASE
+                                                       WHEN ptc.tick < psdp.lower_bound THEN
+                                                           psdp.liquidity *
+                                                           (POWER(1.0000005::NUMERIC, psdp.upper_bound) -
+                                                            POWER(1.0000005::NUMERIC, psdp.lower_bound))
+                                                       WHEN ptc.tick < psdp.upper_bound THEN
+                                                           psdp.liquidity *
+                                                           (POWER(1.0000005::NUMERIC, psdp.upper_bound) -
+                                                            POWER(1.0000005::NUMERIC, ptc.tick))
+                                                       ELSE
+                                                           0
+                                                      END)                                                           AS amount1,
+
                                                   (LEAST(ptc.tick + pairs.volatility_in_ticks, psdp.upper_bound) -
                                                    GREATEST(ptc.tick - pairs.volatility_in_ticks, psdp.lower_bound)) AS ticks_in_range,
 
                                                   psdp.upper_bound - psdp.lower_bound                                AS position_width,
+
                                                   ROUND(
                                                           GREATEST(EXTRACT(
                                                                            EPOCH FROM (
@@ -218,12 +241,8 @@ WITH
                                           salt,
                                           lower_bound,
                                           upper_bound,
-                                          SUM(CASE
-                                                  WHEN active
-                                                      THEN
-                                                      liquidity * (ticks_in_range / position_width) * row_seconds
-                                                  ELSE 0
-                                              END) AS liquidity_seconds
+                                          SUM((amount0_in_amount1 + amount1) * (ticks_in_range / position_width) *
+                                              row_seconds) AS amount1_seconds
 
                                    FROM position_liquidity_seconds_per_row
 
@@ -234,7 +253,7 @@ WITH
                                                token1,
                                                locker,
                                                salt,
-                                               SUM(liquidity_seconds *
+                                               SUM(amount1_seconds *
                                                    POWER((340282366920938463463374607431768211456 - fee) /
                                                          340282366920938463463374607431768211456,
                                                          2)) AS liquidity_seconds
