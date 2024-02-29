@@ -1,0 +1,42 @@
+name: Run script
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    name: Run query
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install psql
+        run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends postgresql-client
+
+      - name: Run query
+        run: |
+          export PGPASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
+          
+          psql -f ./query.sql \
+            -o ./result.csv \
+            --csv \
+            -h ${{ secrets.POSTGRES_HOST }} \
+            -p ${{ secrets.POSTGRES_PORT }} \
+            -d ${{ secrets.POSTGRES_DB }} \
+            -U ${{ secrets.POSTGRES_USERNAME }} \
+            -v start="'2023-09-14T00:00:00'" \
+            -v end="'2023-09-15T00:00:00'"
+
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: result.csv
+          path: ./query.sql

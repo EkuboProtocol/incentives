@@ -4,7 +4,7 @@ WITH
                      FROM event_keys
                      WHERE block_number >= (SELECT number
                                             FROM blocks
-                                            WHERE time >= ${start}
+                                            WHERE time >= :start
                                             ORDER BY number
                                             LIMIT 1)
                      ORDER BY id
@@ -15,7 +15,7 @@ WITH
                      FROM event_keys
                      WHERE block_number <= (SELECT number
                                             FROM blocks
-                                            WHERE time < ${end}
+                                            WHERE time < :end
                                             ORDER BY number DESC
                                             LIMIT 1)
                      ORDER BY id DESC
@@ -68,7 +68,7 @@ WITH
     all_pool_tick_changes_due_to_events AS (SELECT sps.first_event_id             AS event_id,
                                                    key_hash                       AS pool_key_hash,
                                                    starting_tick                  AS tick,
-                                                   GREATEST(sps_b.time, ${start}) AS time
+                                                   GREATEST(sps_b.time, :start) AS time
                                             FROM starting_pool_states sps
                                                      JOIN event_keys sps_ek ON sps.first_event_id = sps_ek.id
                                                      JOIN blocks sps_b ON sps_ek.block_number = sps_b.number
@@ -142,7 +142,7 @@ WITH
                                               pu.upper_bound,
                                               pu.liquidity_delta,
                                               -- pretend like the position was updated at the very beginning of the period
-                                              ${start}::timestamptz AS update_time
+                                              :start::timestamptz AS update_time
                                        FROM positions_created_before_start_with_nonzero_liquidity pu
                                        UNION ALL
                                        SELECT pu.event_id  update_event_id,
@@ -191,8 +191,8 @@ WITH
                                                                   GREATEST(EXTRACT(
                                                                                    EPOCH FROM (
                                                                               LEAST(
-                                                                                      COALESCE(psdp.next_update_time, ${end}),
-                                                                                      COALESCE(ptc.next_tick_change_time, ${end})) -
+                                                                                      COALESCE(psdp.next_update_time, :end),
+                                                                                      COALESCE(ptc.next_tick_change_time, :end)) -
                                                                               GREATEST(psdp.update_time, ptc.tick_change_time)
                                                                               )
                                                                            ), 0)
@@ -256,7 +256,7 @@ WITH
 
 SELECT owner,
        token_id,
-       rewards_percent * pairs.percent_total
+       rewards_percent * pairs.percent_total as percent_of_total
 FROM position_percent_of_pair_rewards ppopr
          JOIN pairs ON ppopr.token0 = pairs.token0 AND ppopr.token1 = pairs.token1
          JOIN token_owners ON token_id = salt;
