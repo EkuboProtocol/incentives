@@ -41,7 +41,7 @@ const pairData: {
   };
 });
 
-console.log("Fetched results", incentiveData);
+console.log("Using pair data", pairData);
 
 const client = new pg.Client();
 
