@@ -18,28 +18,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install psql
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends postgresql-client
-
-      - name: Run query
-        run: |
-          export PGPASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
-          
-          psql --echo-errors -f ./query.sql \
-            -o ./result.csv \
-            --csv \
-            -h ${{ secrets.POSTGRES_HOST }} \
-            -p ${{ secrets.POSTGRES_PORT }} \
-            -d ${{ secrets.POSTGRES_DB }} \
-            -U ${{ secrets.POSTGRES_USERNAME }} \
-            -w \
-            -v start="'2024-02-22T00:00:00'" \
-            -v end="'2024-02-29T00:00:00'"
-
-      - name: Upload result
-        uses: actions/upload-artifact@v4
+      - uses: actions/setup-node@v4
         with:
-          name: result.csv
-          path: ./result.csv
+          node-version: 20
+          cache: 'npm'
+
+      - name: Update table
+        env:
+          PGHOST: ${{ secrets.POSTGRES_HOST }}
+          PGPORT: ${{ secrets.POSTGRES_PORT }}
+          PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          PGDATABASE: ${{ secrets.POSTGRES_DB }}
+          PGUSER: ${{ secrets.POSTGRES_USERNAME }}
+        run: npm start
