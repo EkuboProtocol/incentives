@@ -54,7 +54,7 @@ WITH
 
     hourly_pair_prices AS (SELECT pool_keys.token0,
                                   pool_keys.token1,
-                                  date_bin(INTERVAL '1 hour', blocks.time,
+                                  DATE_BIN(INTERVAL '1 hour', blocks.time,
                                            '2000-01-01 00:00:00'::TIMESTAMP WITHOUT TIME ZONE) AS period_start,
                                   MIN(event_id)                                                AS first_event_id,
                                   SUM(swaps.delta1 * swaps.delta1) /
@@ -236,7 +236,6 @@ WITH
                                              JOIN pool_keys ON key_hash = pool_key_hash
                                     GROUP BY token0, token1, locker, salt),
 
-
     -- sum up the total liquidity seconds by pair
     total_depth_seconds_per_pair AS (SELECT token0,
                                             token1,
@@ -247,13 +246,13 @@ WITH
     -- the percentage of each position's share of total depth seconds per pair
     position_percent_of_pair_rewards AS (SELECT locker,
                                                 salt,
-                                                pls.token0,
-                                                pls.token1,
-                                                (pls.fee_adjusted_total_score / tdspp.total) AS position_rewards_share
-                                         FROM position_pair_depth_seconds pls
+                                                ppds.token0,
+                                                ppds.token1,
+                                                (ppds.fee_adjusted_total_score / tdspp.total) AS position_rewards_share
+                                         FROM position_pair_depth_seconds ppds
                                                   JOIN total_depth_seconds_per_pair tdspp
-                                                       ON pls.token0 = tdspp.token0 AND pls.token1 = tdspp.token1
-                                         WHERE pls.fee_adjusted_total_score > 0
+                                                       ON ppds.token0 = tdspp.token0 AND ppds.token1 = tdspp.token1
+                                         WHERE ppds.fee_adjusted_total_score > 0
                                            AND tdspp.total > 0),
 
     ranked_transfers AS (SELECT token_id,
