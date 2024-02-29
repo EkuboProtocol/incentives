@@ -54,7 +54,7 @@ WITH
 
     hourly_pair_prices AS (SELECT pool_keys.token0,
                                   pool_keys.token1,
-                                  DATE_BIN(INTERVAL '1 hour', blocks.time,
+                                  date_bin(INTERVAL '1 hour', blocks.time,
                                            '2000-01-01 00:00:00'::TIMESTAMP WITHOUT TIME ZONE) AS period_start,
                                   MIN(event_id)                                                AS first_event_id,
                                   SUM(swaps.delta1 * swaps.delta1) /
@@ -173,12 +173,17 @@ WITH
                                                        (POWER(1.0000005::NUMERIC, upper_bound) -
                                                         POWER(1.0000005::NUMERIC, lower_bound))) END)     AS amount1,
 
+                                       (LEAST(hpp.tick + (pairs.volatility_in_ticks / 2), psdp.upper_bound) -
+                                        GREATEST(hpp.tick - (pairs.volatility_in_ticks / 2),
+                                                 psdp.lower_bound))                                       AS ticks_in_range_of_1_half_volatility,
+
                                        (LEAST(hpp.tick + pairs.volatility_in_ticks, psdp.upper_bound) -
                                         GREATEST(hpp.tick - pairs.volatility_in_ticks, psdp.lower_bound)) AS ticks_in_range_of_1_volatility,
 
                                        (LEAST(hpp.tick + (pairs.volatility_in_ticks * 2), psdp.upper_bound) -
                                         GREATEST(hpp.tick - (pairs.volatility_in_ticks * 2),
                                                  psdp.lower_bound))                                       AS ticks_in_range_of_2_volatility,
+
                                        (LEAST(hpp.tick + (pairs.volatility_in_ticks * 3), psdp.upper_bound) -
                                         GREATEST(hpp.tick - (pairs.volatility_in_ticks * 3),
                                                  psdp.lower_bound))                                       AS ticks_in_range_of_3_volatility,
@@ -208,15 +213,13 @@ WITH
                                       salt,
                                       lower_bound,
                                       upper_bound,
-                                      SUM(((amount0_in_terms_of_amount1 + amount1) *
-                                           (ticks_in_range_of_1_volatility / position_width) *
-                                           row_seconds * 0.683) +
-                                          ((amount0_in_terms_of_amount1 + amount1) *
-                                           (ticks_in_range_of_2_volatility / position_width) *
-                                           row_seconds * 0.271) +
-                                          ((amount0_in_terms_of_amount1 + amount1) *
-                                           (ticks_in_range_of_3_volatility / position_width) *
-                                           row_seconds * 0.043)
+                                      SUM(
+                                              (amount0_in_terms_of_amount1 + amount1) *
+                                              row_seconds *
+                                              (ticks_in_range_of_1_half_volatility * 0.382 +
+                                               ticks_in_range_of_1_volatility * 0.301 +
+                                               ticks_in_range_of_2_volatility * 0.271 +
+                                               ticks_in_range_of_3_volatility * 0.043) / position_width
                                       ) AS market_depth_score
 
                                FROM position_depth_per_time
