@@ -1,10 +1,45 @@
 import pg from "pg";
 
+const date =
+  process.env.RUN_DATE ??
+  new Date(Date.now() - 86_400_000).toISOString().split("T")[0];
+
+console.log("Computing data for day", date);
+
 const incentiveDataResponse = await fetch(
   "https://mainnet-api.ekubo.org/defi-spring-incentives"
 );
 
-const incentiveData = await incentiveDataResponse.json();
+const incentiveData = (await incentiveDataResponse.json()) as {
+  pairs: {
+    token0: { symbol: string; l2_token_address: string };
+    token1: { symbol: string; l2_token_address: string };
+    allocations: {
+      date: string;
+      allocation: number;
+      thirty_day_realized_volatility: number;
+    }[];
+  }[];
+};
+
+const pairData: {
+  token0: bigint;
+  token1: bigint;
+  allocation: number;
+  volatility_in_ticks: number;
+}[] = incentiveData.pairs.map(({ token0, token1, allocations }) => {
+  const dayData = allocations?.find((a) => a.date === date);
+  if (!dayData)
+    throw new Error(`Missing day data for ${token0.symbol}/${token1.symbol}`);
+  return {
+    token0: BigInt(token0.l2_token_address),
+    token1: BigInt(token1.l2_token_address),
+    allocation: dayData.allocation,
+    volatility_in_ticks: Math.round(
+      Math.log(1 + dayData.thirty_day_realized_volatility) / Math.log(1.000001)
+    ),
+  };
+});
 
 console.log("Fetched results", incentiveData);
 
@@ -24,53 +59,10 @@ await client.query(`CREATE TABLE IF NOT EXISTS strk_defi_spring_incentives
                           PRIMARY KEY (locker, salt, day)
                       );`);
 
-const date = `${
-  new Date(Date.now() - 86_400_000).toISOString().split("T")[0]
-}T00:00:00Z`;
-
 console.log("Schema initialized, populating table for start date", date);
 
-// todo: get this from parsing the mainnet response
-const PAIR_DATA: {
-  token0: bigint;
-  token1: bigint;
-  allocation: number;
-  volatility_in_ticks: number;
-}[] = [
-  {
-    token0: 0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938dn,
-    token1: 0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8n,
-    allocation: 0.21027095439414,
-    volatility_in_ticks: 553242,
-  },
-  {
-    token0: 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7n,
-    token1: 0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8n,
-    allocation: 0.2790427107711134,
-    volatility_in_ticks: 103174,
-  },
-  {
-    token0: 0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8n,
-    token1: 0x068f5c6a61780768455de69077e07e89787839bf8166decfbf92b645209c0fb8n,
-    allocation: 0.08266904726513483,
-    volatility_in_ticks: 14150,
-  },
-  {
-    token0: 0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8n,
-    token1: 0x068f5c6a61780768455de69077e07e89787839bf8166decfbf92b645209c0fb8n,
-    allocation: 0.08266904726513483,
-    volatility_in_ticks: 14150,
-  },
-  {
-    token0: 0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938dn,
-    token1: 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7n,
-    allocation: 0.4280172875696118,
-    volatility_in_ticks: 541258,
-  },
-];
-
 await client.query({
-  values: [new Date(date)],
+  values: [new Date(`${date}T00:00:00Z`)],
   text: `
       INSERT INTO strk_defi_spring_incentives (WITH
                                                    -- the first event contained in the period
@@ -98,12 +90,16 @@ await client.query({
                                                    -- each of the pairs that are included in the program and their total share of incentives
                                                    pairs AS (SELECT token0, token1, strk_rewards, volatility_in_ticks
                                                              FROM (VALUES
-                                                                        ${PAIR_DATA.map(
-                                                                          (p) =>
-                                                                            `(${p.token0}::NUMERIC, ${p.token1}::NUMERIC, ${p.allocation}::NUMERIC, ${p.volatility_in_ticks}::INT)`
-                                                                        ).join(
-                                                                          "\n,"
-                                                                        )}) AS pairs (token0, token1, strk_rewards, volatility_in_ticks)),
+                                                                        ${pairData
+                                                                          .map(
+                                                                            (
+                                                                              p
+                                                                            ) =>
+                                                                              `(${p.token0}::NUMERIC, ${p.token1}::NUMERIC, ${p.allocation}::NUMERIC, ${p.volatility_in_ticks}::INT)`
+                                                                          )
+                                                                          .join(
+                                                                            "\n,"
+                                                                          )}) AS pairs (token0, token1, strk_rewards, volatility_in_ticks)),
 
 
                                                    -- all the pool keys related to the incentivized pools
