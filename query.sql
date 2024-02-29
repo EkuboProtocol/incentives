@@ -52,68 +52,31 @@ WITH
                                           JOIN pairs ON pairs.token0 = pool_keys.token0 AND
                                                         pairs.token1 = pool_keys.token1 AND extension = 0),
 
-    -- the state of the pools at the beginning of the period or when it was created _iff_ it was created during the period
-    starting_pool_states AS (SELECT rpkh.key_hash         AS key_hash,
-                                    COALESCE(last_swap_before_start.event_id,
-                                             pi.event_id) AS first_event_id,
-                                    COALESCE(last_swap_before_start.tick_after,
-                                             pi.tick)     AS starting_tick
-                             FROM relevant_pool_key_hashes rpkh
-                                      JOIN pool_initializations pi
-                                           ON rpkh.key_hash = pi.pool_key_hash AND
-                                              pi.event_id <= (SELECT id FROM max_event_id)
-                                      LEFT JOIN LATERAL (
-                                 SELECT event_id, tick_after
-                                 FROM swaps
-                                 WHERE swaps.pool_key_hash = rpkh.key_hash
-                                   AND swaps.event_id < (SELECT id FROM min_event_id)
-                                 ORDER BY event_id DESC
-                                 LIMIT 1
-                                 ) AS last_swap_before_start ON TRUE),
-
-    -- each block with a swap and the ranking within the block, plus the resulting tick
-    all_pool_tick_changes_due_to_events AS (SELECT sps.first_event_id           AS event_id,
-                                                   key_hash                     AS pool_key_hash,
-                                                   starting_tick                AS tick,
-                                                   GREATEST(sps_b.time, :start) AS time
-                                            FROM starting_pool_states sps
-                                                     JOIN event_keys sps_ek ON sps.first_event_id = sps_ek.id
-                                                     JOIN blocks sps_b ON sps_ek.block_number = sps_b.number
-                                            UNION ALL
-                                            SELECT s.event_id AS event_id,
-                                                   s.pool_key_hash,
-                                                   tick_after AS tick,
-                                                   s_b.time   AS time
-                                            FROM swaps s
-                                                     JOIN starting_pool_states sps ON s.pool_key_hash = sps.key_hash
-                                                     JOIN event_keys s_ek ON s.event_id = s_ek.id
-                                                     JOIN blocks s_b ON s_ek.block_number = s_b.number
-                                            WHERE s.event_id BETWEEN GREATEST(sps.first_event_id + 1, (SELECT id FROM min_event_id)) AND (SELECT id FROM max_event_id)),
-
-    -- all the relevant times and their rank within block, to be filtered next
-    all_pool_tick_changes_with_ranks AS (SELECT pool_key_hash,
-                                                event_id,
-                                                tick,
-                                                time,
-                                                RANK()
-                                                OVER (PARTITION BY pool_key_hash, time ORDER BY event_id DESC) AS rank_per_time
-                                         FROM all_pool_tick_changes_due_to_events),
-
-    -- the last tick change per time per pool
-    pool_tick_changes_per_time_rank_1 AS (SELECT pool_key_hash,
-                                                 time,
-                                                 event_id,
-                                                 tick
-                                          FROM all_pool_tick_changes_with_ranks
-                                          WHERE rank_per_time = 1),
-
-
-    pool_tick_changes_per_time AS (SELECT pool_key_hash,
-                                          event_id,
-                                          time                                                           AS tick_change_time,
-                                          tick,
-                                          LEAD(time) OVER (PARTITION BY pool_key_hash ORDER BY event_id) AS next_tick_change_time
-                                   FROM pool_tick_changes_per_time_rank_1),
+    hourly_pair_prices AS (SELECT pool_keys.token0,
+                                  pool_keys.token1,
+                                  date_bin(INTERVAL '1 hour', blocks.time,
+                                           '2000-01-01 00:00:00'::TIMESTAMP WITHOUT TIME ZONE) AS period_start,
+                                  MIN(event_id)                                                AS first_event_id,
+                                  SUM(swaps.delta1 * swaps.delta1) /
+                                  SUM(ABS(swaps.delta0 * swaps.delta1))                        AS price,
+                                  FLOOR(LOG(SUM(swaps.delta1 * swaps.delta1) / SUM(ABS(swaps.delta0 * swaps.delta1))) /
+                                        LOG(1.000001))                                         AS tick
+                           FROM swaps
+                                    JOIN pool_keys
+                                         ON swaps.pool_key_hash = pool_keys.key_hash
+                                    JOIN pairs ON pool_keys.token0 = pairs.token0 AND pool_keys.token1 = pairs.token1
+                                    JOIN event_keys ON swaps.event_id = event_keys.id
+                                    JOIN blocks ON event_keys.block_number = blocks.number
+                           WHERE event_id BETWEEN (SELECT id
+                                                   FROM event_keys
+                                                   WHERE block_number >= (SELECT number
+                                                                          FROM blocks
+                                                                          WHERE time >= :start::timestamptz - INTERVAL '1 hour'
+                                                                          ORDER BY number
+                                                                          LIMIT 1)
+                                                   ORDER BY id
+                                                   LIMIT 1) AND (SELECT id FROM max_event_id)
+                           GROUP BY pool_keys.token0, pool_keys.token1, period_start),
 
     -- the state of all the positions aggregated at the beginning of the period
     positions_created_before_start AS (SELECT MAX(event_id)           AS event_id,
@@ -191,31 +154,31 @@ WITH
                                                   upper_bound,
 
                                                   (CASE
-                                                       WHEN ptc.tick < psdp.lower_bound THEN
+                                                       WHEN hpp.tick < psdp.lower_bound THEN
                                                            psdp.liquidity *
                                                            ((1::NUMERIC / POWER(1.0000005::NUMERIC, lower_bound)) -
                                                             (1::NUMERIC / POWER(1.0000005::NUMERIC, upper_bound)))
-                                                       WHEN ptc.tick < psdp.upper_bound THEN
+                                                       WHEN hpp.tick < psdp.upper_bound THEN
                                                            psdp.liquidity *
-                                                           ((1::NUMERIC / POWER(1.0000005::NUMERIC, ptc.tick)) -
+                                                           ((1::NUMERIC / POWER(1.0000005::NUMERIC, hpp.tick)) -
                                                             (1::NUMERIC / POWER(1.0000005::NUMERIC, upper_bound)))
                                                        ELSE 0 END)                                                   AS amount0,
 
                                                   (CASE
-                                                       WHEN ptc.tick < psdp.lower_bound THEN
+                                                       WHEN hpp.tick < psdp.lower_bound THEN
                                                            psdp.liquidity *
                                                            (POWER(1.0000005::NUMERIC, psdp.upper_bound) -
                                                             POWER(1.0000005::NUMERIC, psdp.lower_bound))
-                                                       WHEN ptc.tick < psdp.upper_bound THEN
+                                                       WHEN hpp.tick < psdp.upper_bound THEN
                                                            psdp.liquidity *
                                                            (POWER(1.0000005::NUMERIC, psdp.upper_bound) -
-                                                            POWER(1.0000005::NUMERIC, ptc.tick))
+                                                            POWER(1.0000005::NUMERIC, hpp.tick))
                                                        ELSE
                                                            0
                                                       END)                                                           AS amount1,
 
-                                                  (LEAST(ptc.tick + pairs.volatility_in_ticks, psdp.upper_bound) -
-                                                   GREATEST(ptc.tick - pairs.volatility_in_ticks, psdp.lower_bound)) AS ticks_in_range,
+                                                  (LEAST(hpp.tick + pairs.volatility_in_ticks, psdp.upper_bound) -
+                                                   GREATEST(hpp.tick - pairs.volatility_in_ticks, psdp.lower_bound)) AS ticks_in_range,
 
                                                   psdp.upper_bound - psdp.lower_bound                                AS position_width,
 
@@ -224,15 +187,16 @@ WITH
                                                                            EPOCH FROM (
                                                                       LEAST(
                                                                               COALESCE(psdp.next_update_time, :end),
-                                                                              COALESCE(ptc.next_tick_change_time, :end)) -
-                                                                      GREATEST(psdp.update_time, ptc.tick_change_time)
+                                                                              hpp.period_start + INTERVAL '1 hour') -
+                                                                      GREATEST(psdp.update_time, hpp.period_start)
                                                                       )
                                                                    ), 0)
                                                   )                                                                  AS row_seconds
 
                                            FROM position_states_during_period psdp
-                                                    LEFT JOIN pool_tick_changes_per_time ptc
-                                                              ON psdp.pool_key_hash = ptc.pool_key_hash
+                                                    JOIN pool_keys pk ON psdp.pool_key_hash = pk.key_hash
+                                                    LEFT JOIN hourly_pair_prices hpp
+                                                              ON pk.token0 = hpp.token0 AND pk.token1 = hpp.token1
                                                     JOIN relevant_pool_key_hashes rpkh ON psdp.pool_key_hash = rpkh.key_hash
                                                     JOIN pairs ON rpkh.token0 = pairs.token0 AND rpkh.token1 = pairs.token1),
 
