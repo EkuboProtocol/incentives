@@ -184,40 +184,50 @@ WITH
                                              OVER (PARTITION BY pool_key_hash, locker, salt, lower_bound, upper_bound ORDER BY update_event_id) AS next_update_time
                                       FROM all_position_updates_in_period),
 
-    position_liquidity_seconds AS (SELECT psdp.pool_key_hash AS pool_key_hash,
+    position_liquidity_seconds_per_row AS (SELECT psdp.pool_key_hash                                                 AS pool_key_hash,
+                                                  locker,
+                                                  salt,
+                                                  lower_bound,
+                                                  upper_bound,
+                                                  psdp.liquidity,
+
+                                                  (ptc.tick BETWEEN psdp.lower_bound AND (psdp.upper_bound - 1))     AS active,
+                                                  (LEAST(ptc.tick + pairs.volatility_in_ticks, psdp.upper_bound) -
+                                                   GREATEST(ptc.tick - pairs.volatility_in_ticks, psdp.lower_bound)) AS ticks_in_range,
+
+                                                  psdp.upper_bound - psdp.lower_bound                                AS position_width,
+                                                  ROUND(
+                                                          GREATEST(EXTRACT(
+                                                                           EPOCH FROM (
+                                                                      LEAST(
+                                                                              COALESCE(psdp.next_update_time, :end),
+                                                                              COALESCE(ptc.next_tick_change_time, :end)) -
+                                                                      GREATEST(psdp.update_time, ptc.tick_change_time)
+                                                                      )
+                                                                   ), 0)
+                                                  )                                                                  AS row_seconds
+
+                                           FROM position_states_during_period psdp
+                                                    LEFT JOIN pool_tick_changes_per_time ptc
+                                                              ON psdp.pool_key_hash = ptc.pool_key_hash
+                                                    JOIN relevant_pool_key_hashes rpkh ON psdp.pool_key_hash = rpkh.key_hash
+                                                    JOIN pairs ON rpkh.token0 = pairs.token0 AND rpkh.token1 = pairs.token1),
+
+    position_liquidity_seconds AS (SELECT pool_key_hash,
                                           locker,
                                           salt,
                                           lower_bound,
                                           upper_bound,
-                                          SUM(
-                                                  CASE
-                                                      WHEN (ptc.tick BETWEEN psdp.lower_bound AND (psdp.upper_bound - 1))
-                                                          THEN
-                                                          psdp.liquidity *
-                                                          ((LEAST(ptc.tick + pairs.volatility_in_ticks, psdp.upper_bound) -
-                                                            GREATEST(ptc.tick - pairs.volatility_in_ticks, psdp.lower_bound)) /
-                                                           (psdp.upper_bound - psdp.lower_bound)) *
-                                                          ROUND(
-                                                                  GREATEST(EXTRACT(
-                                                                                   EPOCH FROM (
-                                                                              LEAST(
-                                                                                      COALESCE(psdp.next_update_time, :end),
-                                                                                      COALESCE(ptc.next_tick_change_time, :end)) -
-                                                                              GREATEST(psdp.update_time, ptc.tick_change_time)
-                                                                              )
-                                                                           ), 0)
-                                                          )
-                                                      ELSE 0
-                                                      END
-                                          )                  AS liquidity_seconds
+                                          SUM(CASE
+                                                  WHEN active
+                                                      THEN
+                                                      liquidity * (ticks_in_range / position_width) * row_seconds
+                                                  ELSE 0
+                                              END) AS liquidity_seconds
 
-                                   FROM position_states_during_period psdp
-                                            LEFT JOIN pool_tick_changes_per_time ptc
-                                                      ON psdp.pool_key_hash = ptc.pool_key_hash
-                                            JOIN relevant_pool_key_hashes rpkh ON psdp.pool_key_hash = rpkh.key_hash
-                                            JOIN pairs ON rpkh.token0 = pairs.token0 AND rpkh.token1 = pairs.token1
+                                   FROM position_liquidity_seconds_per_row
 
-                                   GROUP BY psdp.pool_key_hash, locker, salt, lower_bound, upper_bound),
+                                   GROUP BY pool_key_hash, locker, salt, lower_bound, upper_bound),
 
     -- compute each positions liquidity seconds by pair
     position_pair_liquidity_seconds AS (SELECT token0,
