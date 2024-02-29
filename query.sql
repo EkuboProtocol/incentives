@@ -191,15 +191,15 @@ WITH
                                                   upper_bound,
 
                                                   (CASE
-                                                       WHEN ptc.tick < psdp.lower_bound THEN liquidity *
-                                                                                             ((1::NUMERIC / POWER(1.0000005::NUMERIC, lower_bound)) -
-                                                                                              (1::NUMERIC / POWER(1.0000005::NUMERIC, upper_bound)))
-                                                       WHEN ptc.tick < psdp.upper_bound THEN liquidity *
-                                                                                             ((1::NUMERIC / POWER(1.0000005::NUMERIC, ptc.tick)) -
-                                                                                              (1::NUMERIC / POWER(1.0000005::NUMERIC, upper_bound)))
-                                                       ELSE 0 END) *
-                                                      -- todo: this is not an accurate price for the pair, it's just the price for the current pool
-                                                  POWER(1.000001, tick)                                              AS amount0_in_amount1,
+                                                       WHEN ptc.tick < psdp.lower_bound THEN
+                                                           psdp.liquidity *
+                                                           ((1::NUMERIC / POWER(1.0000005::NUMERIC, lower_bound)) -
+                                                            (1::NUMERIC / POWER(1.0000005::NUMERIC, upper_bound)))
+                                                       WHEN ptc.tick < psdp.upper_bound THEN
+                                                           psdp.liquidity *
+                                                           ((1::NUMERIC / POWER(1.0000005::NUMERIC, ptc.tick)) -
+                                                            (1::NUMERIC / POWER(1.0000005::NUMERIC, upper_bound)))
+                                                       ELSE 0 END)                                                   AS amount0,
 
                                                   (CASE
                                                        WHEN ptc.tick < psdp.lower_bound THEN
@@ -241,7 +241,7 @@ WITH
                                           salt,
                                           lower_bound,
                                           upper_bound,
-                                          SUM((amount0_in_amount1 + amount1) * (ticks_in_range / position_width) *
+                                          SUM(SQRT(amount0 * amount1) * (ticks_in_range / position_width) *
                                               row_seconds) AS amount1_seconds
 
                                    FROM position_liquidity_seconds_per_row
