@@ -179,9 +179,14 @@ WITH
                                                        (POWER(1.0000005::NUMERIC, upper_bound) -
                                                         POWER(1.0000005::NUMERIC, lower_bound))) END)     AS amount1,
 
-                                       (LEAST(hpp.tick + (pairs.volatility_in_ticks / 2), psdp.upper_bound) -
-                                        GREATEST(hpp.tick - (pairs.volatility_in_ticks / 2),
-                                                 psdp.lower_bound))                                       AS ticks_in_range_of_1_half_volatility,
+                                       FLOOR(LEAST(hpp.tick + (pairs.volatility_in_ticks * 0.318639),
+                                                   psdp.upper_bound) -
+                                             GREATEST(hpp.tick - (pairs.volatility_in_ticks * 0.318639),
+                                                      psdp.lower_bound))                                  AS ticks_in_range_of_25th_percentile_volatility,
+
+                                       FLOOR(LEAST(hpp.tick + (pairs.volatility_in_ticks / 2), psdp.upper_bound) -
+                                             GREATEST(hpp.tick - (pairs.volatility_in_ticks / 2),
+                                                      psdp.lower_bound))                                  AS ticks_in_range_of_1_half_volatility,
 
                                        (LEAST(hpp.tick + pairs.volatility_in_ticks, psdp.upper_bound) -
                                         GREATEST(hpp.tick - pairs.volatility_in_ticks, psdp.lower_bound)) AS ticks_in_range_of_1_volatility,
@@ -223,7 +228,8 @@ WITH
                                       SUM(
                                               (amount0_in_terms_of_amount1 + amount1) *
                                               row_seconds *
-                                              (ticks_in_range_of_1_half_volatility * 0.382 +
+                                              (ticks_in_range_of_25th_percentile_volatility * 0.25 +
+                                               ticks_in_range_of_1_half_volatility * 0.132 +
                                                ticks_in_range_of_1_volatility * 0.301 +
                                                ticks_in_range_of_2_volatility * 0.271 +
                                                ticks_in_range_of_3_volatility * 0.043) / position_width
