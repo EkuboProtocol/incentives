@@ -22,22 +22,28 @@ WITH
                      LIMIT 1),
 
     -- each of the pairs that are included in the program and their total share of incentives
-    pairs AS (SELECT token0, token1, percent_total
+    pairs AS (SELECT token0, token1, percent_total, volatility_in_ticks
               FROM (VALUES
                         -- strk/usdc
                         (0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d::NUMERIC,
                          0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8::NUMERIC,
-                         0.21027095439414::NUMERIC),
+                         0.21027095439414::NUMERIC,
+                         553242::INT),
                         -- eth/usdc
                         (0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7,
-                         0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8, 0.2790427107711134),
+                         0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8,
+                         0.2790427107711134,
+                         103174),
                         -- usdc/usdt
                         (0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8,
-                         0x068f5c6a61780768455de69077e07e89787839bf8166decfbf92b645209c0fb8, 0.08266904726513483),
+                         0x068f5c6a61780768455de69077e07e89787839bf8166decfbf92b645209c0fb8,
+                         0.08266904726513483,
+                         14150),
                         -- strk/eth
                         (0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d,
                          0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7,
-                         0.4280172875696118)) AS pairs (token0, token1, percent_total)),
+                         0.4280172875696118,
+                         541258)) AS pairs (token0, token1, percent_total, volatility_in_ticks)),
 
 
     -- all the pool keys related to the incentivized pools
@@ -188,6 +194,9 @@ WITH
                                                       WHEN (ptc.tick BETWEEN psdp.lower_bound AND (psdp.upper_bound - 1))
                                                           THEN
                                                           psdp.liquidity *
+                                                          ((LEAST(ptc.tick + pairs.volatility_in_ticks, psdp.upper_bound) -
+                                                            GREATEST(ptc.tick - pairs.volatility_in_ticks, psdp.lower_bound)) /
+                                                           (psdp.upper_bound - psdp.lower_bound)) *
                                                           ROUND(
                                                                   GREATEST(EXTRACT(
                                                                                    EPOCH FROM (
@@ -205,6 +214,8 @@ WITH
                                    FROM position_states_during_period psdp
                                             LEFT JOIN pool_tick_changes_per_time ptc
                                                       ON psdp.pool_key_hash = ptc.pool_key_hash
+                                            JOIN relevant_pool_key_hashes rpkh ON psdp.pool_key_hash = rpkh.key_hash
+                                            JOIN pairs ON rpkh.token0 = pairs.token0 AND rpkh.token1 = pairs.token1
 
                                    GROUP BY psdp.pool_key_hash, locker, salt, lower_bound, upper_bound),
 
