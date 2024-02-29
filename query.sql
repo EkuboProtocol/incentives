@@ -254,7 +254,7 @@ WITH
                      FROM ranked_transfers
                      WHERE row_no = 1)
 
-SELECT owner,
+SELECT numeric_to_hex(owner) as owner,
        token_id,
        rewards_percent * pairs.percent_total as percent_of_total
 FROM position_percent_of_pair_rewards ppopr
