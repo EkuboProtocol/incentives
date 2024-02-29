@@ -52,31 +52,37 @@ WITH
                                           JOIN pairs ON pairs.token0 = pool_keys.token0 AND
                                                         pairs.token1 = pool_keys.token1 AND extension = 0),
 
-    hourly_pair_prices AS (SELECT pool_keys.token0,
-                                  pool_keys.token1,
-                                  date_bin(INTERVAL '1 hour', blocks.time,
-                                           '2000-01-01 00:00:00'::TIMESTAMP WITHOUT TIME ZONE) AS period_start,
-                                  MIN(event_id)                                                AS first_event_id,
-                                  SUM(swaps.delta1 * swaps.delta1) /
-                                  SUM(ABS(swaps.delta0 * swaps.delta1))                        AS price,
-                                  FLOOR(LOG(SUM(swaps.delta1 * swaps.delta1) / SUM(ABS(swaps.delta0 * swaps.delta1))) /
-                                        LOG(1.000001))::INT                                    AS tick
-                           FROM swaps
-                                    JOIN pool_keys
-                                         ON swaps.pool_key_hash = pool_keys.key_hash
-                                    JOIN pairs ON pool_keys.token0 = pairs.token0 AND pool_keys.token1 = pairs.token1
-                                    JOIN event_keys ON swaps.event_id = event_keys.id
-                                    JOIN blocks ON event_keys.block_number = blocks.number
-                           WHERE event_id BETWEEN (SELECT id
-                                                   FROM event_keys
-                                                   WHERE block_number >= (SELECT number
-                                                                          FROM blocks
-                                                                          WHERE time >= :start::timestamptz - INTERVAL '1 hour'
-                                                                          ORDER BY number
-                                                                          LIMIT 1)
-                                                   ORDER BY id
-                                                   LIMIT 1) AND (SELECT id FROM max_event_id)
-                           GROUP BY pool_keys.token0, pool_keys.token1, period_start),
+    hourly_pair_prices_without_next_start AS (SELECT pool_keys.token0,
+                                                     pool_keys.token1,
+                                                     date_bin(INTERVAL '1 hour', blocks.time,
+                                                              '2000-01-01 00:00:00'::TIMESTAMP WITHOUT TIME ZONE) AS period_start,
+                                                     SUM(swaps.delta1 * swaps.delta1) /
+                                                     SUM(ABS(swaps.delta0 * swaps.delta1))                        AS price,
+                                                     FLOOR(LOG(SUM(swaps.delta1 * swaps.delta1) /
+                                                               SUM(ABS(swaps.delta0 * swaps.delta1))) /
+                                                           LOG(1.000001))::INT                                    AS tick
+                                              FROM swaps
+                                                       JOIN pool_keys
+                                                            ON swaps.pool_key_hash = pool_keys.key_hash
+                                                       JOIN pairs
+                                                            ON pool_keys.token0 = pairs.token0 AND pool_keys.token1 = pairs.token1
+                                                       JOIN event_keys ON swaps.event_id = event_keys.id
+                                                       JOIN blocks ON event_keys.block_number = blocks.number
+                                              WHERE event_id BETWEEN (SELECT id
+                                                                      FROM event_keys
+                                                                      WHERE block_number >= (SELECT number
+                                                                                             FROM blocks
+                                                                                             WHERE time >= :start::timestamptz - INTERVAL '1 hour'
+                                                                                             ORDER BY number
+                                                                                             LIMIT 1)
+                                                                      ORDER BY id
+                                                                      LIMIT 1) AND (SELECT id FROM max_event_id)
+                                              GROUP BY pool_keys.token0, pool_keys.token1, period_start),
+
+    hourly_pair_prices AS (SELECT *,
+                                  LEAD(period_start)
+                                  OVER (PARTITION BY token0, token1 ORDER BY period_start) AS next_period_start
+                           FROM hourly_pair_prices_without_next_start),
 
     -- the state of all the positions aggregated at the beginning of the period
     positions_created_before_start AS (SELECT MAX(event_id)           AS event_id,
@@ -195,7 +201,8 @@ WITH
                                                                 EPOCH FROM (
                                                            LEAST(
                                                                    COALESCE(psdp.next_update_time, :end),
-                                                                   hpp.period_start + INTERVAL '1 hour') -
+                                                                   COALESCE(hpp.next_period_start,
+                                                                            hpp.period_start + INTERVAL '1 hours')) -
                                                            GREATEST(psdp.update_time, hpp.period_start)
                                                            )
                                                         ), 0)
