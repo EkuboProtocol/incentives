@@ -18,8 +18,8 @@ jobs:
 
       - name: Install psql
         run: |
-          apt-get update
-          apt-get install --yes --no-install-recommends postgresql-client
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client
 
       - name: Run query
         run: |
