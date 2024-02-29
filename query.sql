@@ -60,7 +60,7 @@ WITH
                                   SUM(swaps.delta1 * swaps.delta1) /
                                   SUM(ABS(swaps.delta0 * swaps.delta1))                        AS price,
                                   FLOOR(LOG(SUM(swaps.delta1 * swaps.delta1) / SUM(ABS(swaps.delta0 * swaps.delta1))) /
-                                        LOG(1.000001))                                         AS tick
+                                        LOG(1.000001))::INT                                    AS tick
                            FROM swaps
                                     JOIN pool_keys
                                          ON swaps.pool_key_hash = pool_keys.key_hash
@@ -147,35 +147,31 @@ WITH
                                              OVER (PARTITION BY pool_key_hash, locker, salt, lower_bound, upper_bound ORDER BY update_event_id) AS next_update_time
                                       FROM all_position_updates_in_period),
 
-    position_liquidity_seconds_per_row AS (SELECT psdp.pool_key_hash                                                 AS pool_key_hash,
+    position_depth_per_time AS (SELECT psdp.pool_key_hash                                                 AS pool_key_hash,
                                                   locker,
                                                   salt,
                                                   lower_bound,
                                                   upper_bound,
 
                                                   (CASE
-                                                       WHEN hpp.tick < psdp.lower_bound THEN
-                                                           psdp.liquidity *
-                                                           ((1::NUMERIC / POWER(1.0000005::NUMERIC, lower_bound)) -
-                                                            (1::NUMERIC / POWER(1.0000005::NUMERIC, upper_bound)))
-                                                       WHEN hpp.tick < psdp.upper_bound THEN
-                                                           psdp.liquidity *
-                                                           ((1::NUMERIC / POWER(1.0000005::NUMERIC, hpp.tick)) -
-                                                            (1::NUMERIC / POWER(1.0000005::NUMERIC, upper_bound)))
-                                                       ELSE 0 END)                                                   AS amount0,
+                                                       WHEN tick < lower_bound THEN FLOOR(liquidity *
+                                                                                          ((1::NUMERIC / POWER(1.0000005::NUMERIC, lower_bound)) -
+                                                                                           (1::NUMERIC / POWER(1.0000005::NUMERIC, upper_bound))))
+                                                       WHEN tick < upper_bound THEN FLOOR(liquidity *
+                                                                                          ((1::NUMERIC / POWER(1.0000005::NUMERIC, hpp.tick)) -
+                                                                                           (1::NUMERIC / POWER(1.0000005::NUMERIC, upper_bound))))
+                                                       ELSE 0 END) *
+                                                  hpp.price                                                          AS amount0_in_terms_of_amount1,
 
                                                   (CASE
-                                                       WHEN hpp.tick < psdp.lower_bound THEN
-                                                           psdp.liquidity *
-                                                           (POWER(1.0000005::NUMERIC, psdp.upper_bound) -
-                                                            POWER(1.0000005::NUMERIC, psdp.lower_bound))
-                                                       WHEN hpp.tick < psdp.upper_bound THEN
-                                                           psdp.liquidity *
-                                                           (POWER(1.0000005::NUMERIC, psdp.upper_bound) -
-                                                            POWER(1.0000005::NUMERIC, hpp.tick))
-                                                       ELSE
-                                                           0
-                                                      END)                                                           AS amount1,
+                                                       WHEN tick < lower_bound THEN 0
+                                                       WHEN tick < upper_bound THEN FLOOR(
+                                                               liquidity *
+                                                               (POWER(1.0000005::NUMERIC, hpp.tick) -
+                                                                POWER(1.0000005::NUMERIC, lower_bound)))
+                                                       ELSE FLOOR(liquidity *
+                                                                  (POWER(1.0000005::NUMERIC, upper_bound) -
+                                                                   POWER(1.0000005::NUMERIC, lower_bound))) END)     AS amount1,
 
                                                   (LEAST(hpp.tick + pairs.volatility_in_ticks, psdp.upper_bound) -
                                                    GREATEST(hpp.tick - pairs.volatility_in_ticks, psdp.lower_bound)) AS ticks_in_range,
@@ -200,20 +196,22 @@ WITH
                                                     JOIN relevant_pool_key_hashes rpkh ON psdp.pool_key_hash = rpkh.key_hash
                                                     JOIN pairs ON rpkh.token0 = pairs.token0 AND rpkh.token1 = pairs.token1),
 
-    position_liquidity_seconds AS (SELECT pool_key_hash,
-                                          locker,
-                                          salt,
-                                          lower_bound,
-                                          upper_bound,
-                                          SUM(SQRT(amount0 * amount1) * (ticks_in_range / position_width) *
-                                              row_seconds) AS amount1_seconds
 
-                                   FROM position_liquidity_seconds_per_row
+    position_depth_seconds AS (SELECT pool_key_hash,
+                                      locker,
+                                      salt,
+                                      lower_bound,
+                                      upper_bound,
+                                      SUM((amount0_in_terms_of_amount1 + amount1) *
+                                          (ticks_in_range / position_width) *
+                                          row_seconds) AS amount1_seconds
 
-                                   GROUP BY pool_key_hash, locker, salt, lower_bound, upper_bound),
+                               FROM position_depth_per_time
+
+                               GROUP BY pool_key_hash, locker, salt, lower_bound, upper_bound),
 
     -- compute each positions liquidity seconds by pair
-    position_pair_liquidity_seconds AS (SELECT token0,
+    position_pair_depth_seconds AS (SELECT token0,
                                                token1,
                                                locker,
                                                salt,
@@ -221,26 +219,26 @@ WITH
                                                    POWER((340282366920938463463374607431768211456 - fee) /
                                                          340282366920938463463374607431768211456,
                                                          2)) AS liquidity_seconds
-                                        FROM position_liquidity_seconds
+                                        FROM position_depth_seconds
                                                  JOIN pool_keys ON key_hash = pool_key_hash
                                         GROUP BY token0, token1, locker, salt),
 
 
     -- sum up the total liquidity seconds by pair
-    total_liquidity_seconds_by_pair AS (SELECT token0,
+    total_depth_seconds_per_pair AS (SELECT token0,
                                                token1,
                                                GREATEST(SUM(liquidity_seconds), 1) total
-                                        FROM position_pair_liquidity_seconds
+                                        FROM position_pair_depth_seconds
                                         GROUP BY token0, token1),
 
-    -- the percentage of each position's share of total liquidity seconds per pair
+    -- the percentage of each position's share of total depth seconds per pair
     position_percent_of_pair_rewards AS (SELECT locker,
                                                 salt,
                                                 pls.token0,
                                                 pls.token1,
                                                 (pls.liquidity_seconds / tlsbp.total) AS rewards_percent
-                                         FROM position_pair_liquidity_seconds pls
-                                                  JOIN total_liquidity_seconds_by_pair tlsbp
+                                         FROM position_pair_depth_seconds pls
+                                                  JOIN total_depth_seconds_per_pair tlsbp
                                                        ON pls.token0 = tlsbp.token0 AND pls.token1 = tlsbp.token1
                                          WHERE pls.liquidity_seconds > 0),
 
