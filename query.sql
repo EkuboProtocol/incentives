@@ -174,7 +174,14 @@ WITH
                                                         POWER(1.0000005::NUMERIC, lower_bound))) END)     AS amount1,
 
                                        (LEAST(hpp.tick + pairs.volatility_in_ticks, psdp.upper_bound) -
-                                        GREATEST(hpp.tick - pairs.volatility_in_ticks, psdp.lower_bound)) AS ticks_in_range,
+                                        GREATEST(hpp.tick - pairs.volatility_in_ticks, psdp.lower_bound)) AS ticks_in_range_of_1_volatility,
+
+                                       (LEAST(hpp.tick + (pairs.volatility_in_ticks * 2), psdp.upper_bound) -
+                                        GREATEST(hpp.tick - (pairs.volatility_in_ticks * 2),
+                                                 psdp.lower_bound))                                       AS ticks_in_range_of_2_volatility,
+                                       (LEAST(hpp.tick + (pairs.volatility_in_ticks * 3), psdp.upper_bound) -
+                                        GREATEST(hpp.tick - (pairs.volatility_in_ticks * 3),
+                                                 psdp.lower_bound))                                       AS ticks_in_range_of_3_volatility,
 
                                        psdp.upper_bound - psdp.lower_bound                                AS position_width,
 
@@ -196,15 +203,21 @@ WITH
                                          JOIN relevant_pool_key_hashes rpkh ON psdp.pool_key_hash = rpkh.key_hash
                                          JOIN pairs ON rpkh.token0 = pairs.token0 AND rpkh.token1 = pairs.token1),
 
-
     position_depth_seconds AS (SELECT pool_key_hash,
                                       locker,
                                       salt,
                                       lower_bound,
                                       upper_bound,
-                                      SUM((amount0_in_terms_of_amount1 + amount1) *
-                                          (ticks_in_range / position_width) *
-                                          row_seconds) AS market_depth_score
+                                      SUM(((amount0_in_terms_of_amount1 + amount1) *
+                                           (ticks_in_range_of_1_volatility / position_width) *
+                                           row_seconds * 0.683) +
+                                          ((amount0_in_terms_of_amount1 + amount1) *
+                                           (ticks_in_range_of_2_volatility / position_width) *
+                                           row_seconds * 0.271) +
+                                          ((amount0_in_terms_of_amount1 + amount1) *
+                                           (ticks_in_range_of_3_volatility / position_width) *
+                                           row_seconds * 0.043)
+                                      ) AS market_depth_score
 
                                FROM position_depth_per_time
 
@@ -240,7 +253,8 @@ WITH
                                          FROM position_pair_depth_seconds pls
                                                   JOIN total_depth_seconds_per_pair tdspp
                                                        ON pls.token0 = tdspp.token0 AND pls.token1 = tdspp.token1
-                                         WHERE pls.fee_adjusted_total_score > 0 AND tdspp.total > 0),
+                                         WHERE pls.fee_adjusted_total_score > 0
+                                           AND tdspp.total > 0),
 
     ranked_transfers AS (SELECT token_id,
                                 to_address,
