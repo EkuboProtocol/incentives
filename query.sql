@@ -26,7 +26,8 @@ WITH
               FROM (VALUES
                         -- strk/usdc
                         (0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d::NUMERIC,
-                         0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8::NUMERIC, 0.21027095439414::NUMERIC),
+                         0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8::NUMERIC,
+                         0.21027095439414::NUMERIC),
                         -- eth/usdc
                         (0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7,
                          0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8, 0.2790427107711134),
@@ -65,9 +66,9 @@ WITH
                                  ) AS last_swap_before_start ON TRUE),
 
     -- each block with a swap and the ranking within the block, plus the resulting tick
-    all_pool_tick_changes_due_to_events AS (SELECT sps.first_event_id             AS event_id,
-                                                   key_hash                       AS pool_key_hash,
-                                                   starting_tick                  AS tick,
+    all_pool_tick_changes_due_to_events AS (SELECT sps.first_event_id           AS event_id,
+                                                   key_hash                     AS pool_key_hash,
+                                                   starting_tick                AS tick,
                                                    GREATEST(sps_b.time, :start) AS time
                                             FROM starting_pool_states sps
                                                      JOIN event_keys sps_ek ON sps.first_event_id = sps_ek.id
@@ -134,7 +135,7 @@ WITH
     -- treat these initial positions as if they were created exactly at the beginning of the period by creating
     -- one row for a position update for each of them
     -- there is no filter on the time of the tick update, because all tick updates happened in the period and these positions happened before
-    all_position_updates_in_period AS (SELECT pu.event_id              update_event_id,
+    all_position_updates_in_period AS (SELECT pu.event_id            update_event_id,
                                               pu.pool_key_hash,
                                               pu.locker,
                                               pu.salt,
@@ -254,9 +255,10 @@ WITH
                      FROM ranked_transfers
                      WHERE row_no = 1)
 
-SELECT numeric_to_hex(owner) as owner,
+SELECT numeric_to_hex(owner)                 AS owner,
        token_id,
-       rewards_percent * pairs.percent_total as percent_of_total
+       rewards_percent * pairs.percent_total AS percent_of_total
 FROM position_percent_of_pair_rewards ppopr
          JOIN pairs ON ppopr.token0 = pairs.token0 AND ppopr.token1 = pairs.token1
-         JOIN token_owners ON token_id = salt;
+         JOIN token_owners ON token_id = salt
+ORDER BY 3 DESC;
