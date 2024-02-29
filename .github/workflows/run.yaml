@@ -23,6 +23,8 @@ jobs:
           node-version: 20
           cache: 'npm'
 
+      - run: npm install
+
       - name: Update table
         env:
           PGHOST: ${{ secrets.POSTGRES_HOST }}
