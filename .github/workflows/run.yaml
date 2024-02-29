@@ -33,8 +33,8 @@ jobs:
             -d ${{ secrets.POSTGRES_DB }} \
             -U ${{ secrets.POSTGRES_USERNAME }} \
             -w \
-            -v start="'2023-09-14T00:00:00'" \
-            -v end="'2023-09-15T00:00:00'"
+            -v start="'2024-02-22T00:00:00'" \
+            -v end="'2023-03-07T00:00:00'"
 
       - name: Upload result
         uses: actions/upload-artifact@v4
