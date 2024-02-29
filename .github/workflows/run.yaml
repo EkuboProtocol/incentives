@@ -36,7 +36,7 @@ jobs:
             -U ${{ secrets.POSTGRES_USERNAME }} \
             -w \
             -v start="'2024-02-22T00:00:00'" \
-            -v end="'2024-03-07T00:00:00'"
+            -v end="'2024-02-29T00:00:00'"
 
       - name: Upload result
         uses: actions/upload-artifact@v4
