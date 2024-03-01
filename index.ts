@@ -16,9 +16,9 @@ const incentiveData = (await incentiveDataResponse.json()) as {
   }[];
 };
 
-const dates = process.env.RUN_DATES.split(",") ?? [
-  new Date(Date.now() - 86_400_000).toISOString().split("T")[0],
-];
+const dates = process.env.RUN_DATES
+  ? process.env.RUN_DATES.split(",")
+  : [new Date(Date.now() - 86_400_000).toISOString().split("T")[0]];
 
 const client = new pg.Client();
 await client.connect();
