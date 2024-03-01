@@ -16,7 +16,7 @@ const incentiveData = (await incentiveDataResponse.json()) as {
   }[];
 };
 
-const dates = process.env.RUN_DATES
+const dates = process.env.RUN_DATES?.length
   ? process.env.RUN_DATES.split(",")
   : [new Date(Date.now() - 86_400_000).toISOString().split("T")[0]];
 
@@ -38,6 +38,8 @@ await client.query(`CREATE TABLE IF NOT EXISTS strk_defi_spring_incentives
 console.log("Schema initialized");
 
 for (const date of dates) {
+  console.log("Starting processing for date", date);
+
   const pairData: {
     token0: { l2_token_address: string; symbol: string };
     token1: { l2_token_address: string; symbol: string };
