@@ -267,6 +267,13 @@ for (const date of dates) {
                                                                                          POWER(1.0000005::NUMERIC, lower_bound))) END)     AS amount1,
 
                                                                         FLOOR(LEAST(hpp.tick +
+                                                                                    (pairs.volatility_in_ticks * 0.1),
+                                                                                    psdp.upper_bound) -
+                                                                              GREATEST(hpp.tick -
+                                                                                       (pairs.volatility_in_ticks * 0.1),
+                                                                                       psdp.lower_bound))                                  AS ticks_in_range_of_10th_percentile_volatility,
+                                                                     
+                                                                        FLOOR(LEAST(hpp.tick +
                                                                                     (pairs.volatility_in_ticks * 0.318639),
                                                                                     psdp.upper_bound) -
                                                                               GREATEST(hpp.tick -
@@ -324,8 +331,10 @@ for (const date of dates) {
                                                                                            SUM(
                                                                                                    (amount0_in_terms_of_amount1 + amount1) *
                                                                                                    row_seconds *
-                                                                                                   (ticks_in_range_of_25th_percentile_volatility *
-                                                                                                    0.25 +
+                                                                                                   (ticks_in_range_of_10th_percentile_volatility *
+                                                                                                    0.0796 +
+                                                                                                    ticks_in_range_of_25th_percentile_volatility *
+                                                                                                    0.1704 +
                                                                                                     ticks_in_range_of_1_half_volatility *
                                                                                                     0.132 +
                                                                                                     ticks_in_range_of_1_volatility *
