@@ -21,9 +21,8 @@ const dates = process.env.RUN_DATES?.length
   : [new Date(Date.now() - 86_400_000).toISOString().split("T")[0]];
 
 const client = new pg.Client();
-await client.connect();
 
-await client.query(`BEGIN;`);
+await client.connect();
 
 await client.query(`CREATE TABLE IF NOT EXISTS strk_defi_spring_incentives
                     (
@@ -79,6 +78,38 @@ for (const date of dates) {
 
   const queryDate = `'${date}T00:00:00Z'`;
 
+  const standardDeviationWeights = [
+    { multiple: 0.03, weight: 0.024 },
+    { multiple: 0.06, weight: 0.0478 },
+    { multiple: 0.09, weight: 0.0718 },
+    { multiple: 0.12, weight: 0.0956 },
+    { multiple: 0.15, weight: 0.1192 },
+    { multiple: 0.18, weight: 0.1428 },
+    { multiple: 0.22, weight: 0.1742 },
+    { multiple: 0.25, weight: 0.1974 },
+    { multiple: 0.3, weight: 0.2358 },
+    { multiple: 0.35, weight: 0.2736 },
+    { multiple: 0.4, weight: 0.3108 },
+    { multiple: 0.45, weight: 0.3472 },
+    { multiple: 0.5, weight: 0.3829 },
+    { multiple: 0.6, weight: 0.4514 },
+    { multiple: 0.7, weight: 0.516 },
+    { multiple: 0.8, weight: 0.5762 },
+    { multiple: 0.9, weight: 0.6318 },
+    { multiple: 1.0, weight: 0.6827 },
+    { multiple: 1.25, weight: 0.7888 },
+    { multiple: 1.5, weight: 0.8664 },
+    { multiple: 1.75, weight: 0.9198 },
+    { multiple: 2.0, weight: 0.9545 },
+    { multiple: 3.0, weight: 0.9973 },
+  ]
+    .map(({ multiple, weight }, ix, list) =>
+      ix === 0
+        ? `(${multiple}::float, ${weight}::float)`
+        : `(${multiple}, ${weight - list[ix - 1].weight})`
+    )
+    .join(", ");
+
   const queryText = `
       INSERT INTO strk_defi_spring_incentives (WITH
                                                    -- the first event contained in the period
@@ -108,6 +139,9 @@ for (const date of dates) {
                                                        AS (SELECT token0, token1, strk_rewards, volatility_in_ticks
                                                            FROM (values ${pairDataValuesTable}) AS pairs (token0, token1, strk_rewards, volatility_in_ticks)),
 
+                                                   -- the weights corresponding to each multiple of the standard deviation 
+                                                   stddev_multiple_weights AS (SELECT multiple, weight
+                                                                               FROM (values ${standardDeviationWeights}) AS weights (multiple, weight)),
 
                                                    -- all the pool keys related to the incentivized pools
                                                    relevant_pool_key_hashes
@@ -124,12 +158,12 @@ for (const date of dates) {
                                                                   date_bin(
                                                                           INTERVAL '1 hour',
                                                                           blocks.time,
-                                                                          '2000-01-01 00:00:00'::TIMESTAMP WITHOUT TIME ZONE) AS period_start,
+                                                                          '2000-01-01 00:00:00'::timestamptz) AS period_start,
                                                                   SUM(swaps.delta1 * swaps.delta1) /
-                                                                  SUM(ABS(swaps.delta0 * swaps.delta1))                       AS price,
+                                                                  SUM(ABS(swaps.delta0 * swaps.delta1))       AS price,
                                                                   FLOOR(LOG(SUM(swaps.delta1 * swaps.delta1) /
                                                                             SUM(ABS(swaps.delta0 * swaps.delta1))) /
-                                                                        LOG(1.000001))::INT                                   AS tick
+                                                                        LOG(1.000001))::INT                   AS tick
                                                            FROM swaps
                                                                     JOIN pool_keys
                                                                          ON swaps.pool_key_hash = pool_keys.key_hash
@@ -151,32 +185,14 @@ for (const date of dates) {
 
                                                    hourly_pair_prices AS (SELECT hpp.*,
                                                                                  LEAD(period_start)
-                                                                                 OVER (PARTITION BY hpp.token0,hpp.token1 ORDER BY period_start)    AS next_period_start,
+                                                                                 OVER (PARTITION BY hpp.token0, hpp.token1 ORDER BY period_start) AS next_period_start,
+                                                                                 weight,
                                                                                  INT4RANGE(
-                                                                                         CEIL(tick - (pairs.volatility_in_ticks * 0.1))::INT,
-                                                                                         FLOOR(tick + (pairs.volatility_in_ticks * 0.1))::INT)      AS range_1,
-                                                                                 INT4RANGE(
-                                                                                         CEIL(tick - (pairs.volatility_in_ticks * 0.318639))::INT,
-                                                                                         FLOOR(tick + (pairs.volatility_in_ticks * 0.318639))::INT) AS range_2,
-                                                                                 INT4RANGE(
-                                                                                         CEIL(tick - (pairs.volatility_in_ticks * 0.5))::INT,
-                                                                                         FLOOR(tick + (pairs.volatility_in_ticks * 0.5))::INT)      AS range_3,
-                                                                                 INT4RANGE(
-                                                                                         (tick - pairs.volatility_in_ticks)::INT,
-                                                                                         (tick +
-                                                                                          pairs.volatility_in_ticks)::INT)                          AS range_4,
-                                                                                 INT4RANGE(
-                                                                                         (tick - pairs.volatility_in_ticks * 2)::INT,
-                                                                                         (tick +
-                                                                                          pairs.volatility_in_ticks *
-                                                                                          2)::INT)                                                  AS range_5,
-                                                                                 INT4RANGE(
-                                                                                         (tick - pairs.volatility_in_ticks * 3)::INT,
-                                                                                         (tick +
-                                                                                          pairs.volatility_in_ticks *
-                                                                                          3)::INT)                                                  AS range_6
+                                                                                         CEIL(hpp.tick - multiple * volatility_in_ticks)::INT,
+                                                                                         FLOOR(hpp.tick + multiple * volatility_in_ticks)::INT)      stddev_range
                                                                           FROM hourly_pair_prices_without_next_start hpp
-                                                                                   JOIN pairs ON hpp.token0 = pairs.token0 AND hpp.token1 = pairs.token1),
+                                                                                   JOIN pairs ON hpp.token0 = pairs.token0 AND hpp.token1 = pairs.token1
+                                                                                   JOIN stddev_multiple_weights ON TRUE),
 
                                                    -- the state of all the positions aggregated at the beginning of the period
                                                    positions_created_before_start
@@ -235,7 +251,8 @@ for (const date of dates) {
                                                    position_states_during_period AS (SELECT pool_key_hash,
                                                                                             locker,
                                                                                             salt,
-                                                                                            INT4RANGE(lower_bound, upper_bound)                                                                AS tick_range,
+                                                                                            lower_bound,
+                                                                                            upper_bound,
 
                                                                                             SUM(liquidity_delta)
                                                                                             OVER (PARTITION BY pool_key_hash, locker, salt, lower_bound, upper_bound ORDER BY update_event_id) AS liquidity,
@@ -250,40 +267,37 @@ for (const date of dates) {
                                                                                      FROM all_position_updates_in_period),
 
                                                    position_depth_per_time
-                                                       AS (SELECT psdp.pool_key_hash                                                   AS pool_key_hash,
+                                                       AS (SELECT psdp.pool_key_hash                                             AS pool_key_hash,
                                                                   locker,
                                                                   salt,
 
                                                                   (CASE
-                                                                       WHEN tick < LOWER(tick_range) THEN FLOOR(
+                                                                       WHEN tick < lower_bound THEN FLOOR(
                                                                                liquidity *
-                                                                               ((1::NUMERIC / POWER(1.0000005::NUMERIC, LOWER(tick_range))) -
-                                                                                (1::NUMERIC / POWER(1.0000005::NUMERIC, UPPER(tick_range)))))
-                                                                       WHEN tick < UPPER(tick_range) THEN FLOOR(
+                                                                               ((1::NUMERIC / POWER(1.0000005::NUMERIC, lower_bound)) -
+                                                                                (1::NUMERIC / POWER(1.0000005::NUMERIC, upper_bound))))
+                                                                       WHEN tick < upper_bound THEN FLOOR(
                                                                                liquidity *
                                                                                ((1::NUMERIC / POWER(1.0000005::NUMERIC, hpp.tick)) -
-                                                                                (1::NUMERIC / POWER(1.0000005::NUMERIC, UPPER(tick_range)))))
+                                                                                (1::NUMERIC / POWER(1.0000005::NUMERIC, upper_bound))))
                                                                        ELSE 0 END) *
-                                                                  hpp.price                                                            AS amount0_in_terms_of_amount1,
+                                                                  hpp.price                                                      AS amount0_in_terms_of_amount1,
 
                                                                   (CASE
-                                                                       WHEN tick < LOWER(tick_range) THEN 0
-                                                                       WHEN tick < UPPER(tick_range) THEN FLOOR(
+                                                                       WHEN tick < lower_bound THEN 0
+                                                                       WHEN tick < upper_bound THEN FLOOR(
                                                                                liquidity *
                                                                                (POWER(1.0000005::NUMERIC, hpp.tick) -
-                                                                                POWER(1.0000005::NUMERIC, LOWER(tick_range))))
+                                                                                POWER(1.0000005::NUMERIC, lower_bound)))
                                                                        ELSE FLOOR(liquidity *
-                                                                                  (POWER(1.0000005::NUMERIC, UPPER(tick_range)) -
-                                                                                   POWER(1.0000005::NUMERIC, LOWER(tick_range)))) END) AS amount1,
+                                                                                  (POWER(1.0000005::NUMERIC, upper_bound) -
+                                                                                   POWER(1.0000005::NUMERIC, lower_bound))) END) AS amount1,
 
-                                                                  hpp.range_1 * tick_range                                             AS ticks_in_range_1,
-                                                                  hpp.range_2 * tick_range                                             AS ticks_in_range_2,
-                                                                  hpp.range_3 * tick_range                                             AS ticks_in_range_3,
-                                                                  hpp.range_4 * tick_range                                             AS ticks_in_range_4,
-                                                                  hpp.range_5 * tick_range                                             AS ticks_in_range_5,
-                                                                  hpp.range_6 * tick_range                                             AS ticks_in_range_6,
+                                                                  stddev_range * INT4RANGE(lower_bound, upper_bound)             AS ticks_in_range,
 
-                                                                  UPPER(tick_range) - LOWER(tick_range)                                AS position_width,
+                                                                  weight,
+
+                                                                  upper_bound - lower_bound                                      AS position_width,
 
                                                                   ROUND(
                                                                           GREATEST(EXTRACT(
@@ -299,14 +313,15 @@ for (const date of dates) {
                                                                                       GREATEST(psdp.update_time, hpp.period_start)
                                                                                       )
                                                                                    ), 0)
-                                                                  )                                                                    AS row_seconds
-
+                                                                  )                                                              AS row_seconds
+                                                     
                                                            FROM position_states_during_period psdp
                                                                     JOIN pool_keys pk ON psdp.pool_key_hash = pk.key_hash
                                                                     LEFT JOIN hourly_pair_prices hpp
                                                                               ON pk.token0 = hpp.token0 AND pk.token1 = hpp.token1
                                                                     JOIN relevant_pool_key_hashes rpkh ON psdp.pool_key_hash = rpkh.key_hash
-                                                                    JOIN pairs ON rpkh.token0 = pairs.token0 AND rpkh.token1 = pairs.token1),
+                                                                    JOIN pairs ON rpkh.token0 = pairs.token0 AND rpkh.token1 = pairs.token1
+                                                           WHERE NOT ISEMPTY(stddev_range * INT4RANGE(lower_bound, upper_bound))),
 
 
                                                    position_depth_seconds AS (SELECT pool_key_hash,
@@ -315,18 +330,8 @@ for (const date of dates) {
                                                                                      SUM(
                                                                                              (amount0_in_terms_of_amount1 + amount1) *
                                                                                              row_seconds *
-                                                                                             (COALESCE((UPPER(ticks_in_range_1) - LOWER(ticks_in_range_1)), 0) *
-                                                                                              0.0796 +
-                                                                                              COALESCE((UPPER(ticks_in_range_2) - LOWER(ticks_in_range_2)), 0) *
-                                                                                              0.1704 +
-                                                                                              COALESCE((UPPER(ticks_in_range_3) - LOWER(ticks_in_range_3)), 0) *
-                                                                                              0.132 +
-                                                                                              COALESCE((UPPER(ticks_in_range_4) - LOWER(ticks_in_range_4)), 0) *
-                                                                                              0.301 +
-                                                                                              COALESCE((UPPER(ticks_in_range_5) - LOWER(ticks_in_range_5)), 0) *
-                                                                                              0.271 +
-                                                                                              COALESCE((UPPER(ticks_in_range_6) - LOWER(ticks_in_range_6)), 0) *
-                                                                                              0.043) /
+                                                                                             (COALESCE((UPPER(ticks_in_range) - LOWER(ticks_in_range)), 0) *
+                                                                                              weight) /
                                                                                              position_width
                                                                                      ) AS market_depth_score
 
@@ -381,8 +386,9 @@ for (const date of dates) {
 
   console.log("Executing query", queryText);
 
+  await client.query(`BEGIN;`);
   await client.query(queryText);
+  await client.query(`COMMIT;`);
 }
 
-await client.query(`COMMIT;`);
 await client.end();
