@@ -2,7 +2,7 @@ name: Compute user allocations
 
 on:
   schedule:
-    - cron: '0 1 * * *'
+    - cron: '0 1,2,3 * * *'
   workflow_dispatch:
     inputs:
       run_dates:
