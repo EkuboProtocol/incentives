@@ -1,0 +1,36 @@
+name: Compute user allocations
+
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      run_dates:
+        description: 'A comma separated list of ISO dates, e.g. 2024-02-23,2024-02-24 for which to run the computation'
+
+concurrency: query
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    name: Run
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm install
+
+      - name: Update table
+        env:
+          PGHOST: ${{ secrets.POSTGRES_HOST }}
+          PGPORT: ${{ secrets.POSTGRES_PORT }}
+          PGDATABASE: ${{ secrets.POSTGRES_DB }}
+          PGUSER: ${{ secrets.POSTGRES_USERNAME }}
+          PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          RUN_DATES: ${{ inputs.run_dates }}
+        run: npm start

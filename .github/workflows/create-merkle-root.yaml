@@ -1,19 +1,21 @@
-name: Run script
+name: Create merkle root
 
 on:
   schedule:
-    - cron: '0 1 * * *'
+    - cron: '0 2 7,21 3 *'
   workflow_dispatch:
     inputs:
-      run_dates:
-        description: 'A comma separated list of ISO dates, e.g. 2024-02-23,2024-02-24 for which to run the computation'
+      start_date:
+        description: 'The ISO format start date of the date range for which to compute the merkle root'
+      end_date:
+        description: 'The ISO format end date of the date range for which to compute the merkle root'
 
-concurrency: query-2
+concurrency: query
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    name: Run query
+    name: Run
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,5 +34,6 @@ jobs:
           PGDATABASE: ${{ secrets.POSTGRES_DB }}
           PGUSER: ${{ secrets.POSTGRES_USERNAME }}
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          RUN_DATES: ${{ inputs.run_dates }}
-        run: npm start
+          START_DATE: ${{ inputs.start_date }}
+          END_DATE: ${{ inputs.end_date }}
+        run: npm run create-root
