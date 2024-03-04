@@ -27,7 +27,7 @@ await client.query(`
 
     CREATE TABLE IF NOT EXISTS generated_drop_proof
     (
-        drop_id INT REFERENCES generated_drop (id),
+        drop_id INT REFERENCES generated_drop (id) ON DELETE CASCADE,
         id      INT       NOT NULL,
         claimee NUMERIC   NOT NULL,
         amount  NUMERIC   NOT NULL,
