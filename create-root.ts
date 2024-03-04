@@ -34,6 +34,15 @@ await client.query(`
         proof   NUMERIC[] NOT NULL,
         PRIMARY KEY (drop_id, id, claimee)
     );
+
+    -- meant to be manually populated
+    CREATE TABLE IF NOT EXISTS deployed_airdrop_contracts
+    (
+        address NUMERIC NOT NULL PRIMARY KEY,
+        token NUMERIC NOT NULL,
+        drop_id INT REFERENCES generated_drop (id) ON DELETE CASCADE,
+        funded  BOOLEAN NOT NULL
+    );
 `);
 
 await client.query("BEGIN;");
