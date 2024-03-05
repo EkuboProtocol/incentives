@@ -112,6 +112,11 @@ for (const date of dates) {
 
   const priceInterval = "1 hour";
 
+  // first delete everything for the day
+  await client.query(
+    `DELETE FROM strk_defi_spring_incentives WHERE day = ${queryDate}::timestamptz;`
+  );
+
   const queryText = `
       INSERT INTO strk_defi_spring_incentives (WITH
                                                    -- the first event contained in the period
@@ -191,7 +196,7 @@ for (const date of dates) {
                                                                                    weight,
                                                                                    INT4RANGE(
                                                                                            CEIL(ipp.tick - multiple * volatility_in_ticks)::INT,
-                                                                                           FLOOR(ipp.tick + multiple * volatility_in_ticks)::INT)      stddev_range
+                                                                                           FLOOR(ipp.tick + multiple * volatility_in_ticks)::INT)                stddev_range
                                                                             FROM interval_pair_prices_without_next_start ipp
                                                                                      JOIN pairs ON ipp.token0 = pairs.token0 AND ipp.token1 = pairs.token1
                                                                                      JOIN stddev_multiple_weights ON TRUE),
@@ -391,10 +396,7 @@ for (const date of dates) {
                                                       (position_rewards_share * pairs.strk_rewards) AS incentives,
                                                       NOW()                                         AS last_updated
                                                FROM position_percent_of_pair_rewards ppopr
-                                                        JOIN pairs ON ppopr.token0 = pairs.token0 AND ppopr.token1 = pairs.token1)
-      ON CONFLICT (locker, salt, day)
-          DO UPDATE SET incentives   = excluded.incentives,
-                        last_updated = NOW();
+                                                        JOIN pairs ON ppopr.token0 = pairs.token0 AND ppopr.token1 = pairs.token1);
   `;
 
   console.log("Executing query", queryText);
