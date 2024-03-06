@@ -52,30 +52,30 @@ const { rows: rewardsRaw } = await client.query<{
 }>({
   values: [startDate, endDate],
   text: `
-        WITH ranked_transfers AS (SELECT token_id,
-                                         to_address,
-                                         ROW_NUMBER() OVER (
-                                             PARTITION BY token_id
-                                             ORDER BY event_id DESC
-                                             ) AS row_no
-                                  FROM position_transfers pt
-                                           JOIN event_keys ek ON pt.event_id = ek.id
-                                           JOIN blocks b ON ek.block_number = b.number
-                                  WHERE to_address != 0
-                                    AND b.time < $2),
+      WITH ranked_transfers AS (SELECT token_id,
+                                       to_address,
+                                       ROW_NUMBER() OVER (
+                                           PARTITION BY token_id
+                                           ORDER BY event_id DESC
+                                           ) AS row_no
+                                FROM position_transfers pt
+                                         JOIN event_keys ek ON pt.event_id = ek.id
+                                         JOIN blocks b ON ek.block_number = b.number
+                                WHERE to_address != 0
+                                  AND b.time < $2),
 
-             token_owners AS (SELECT token_id,
-                                     to_address AS owner
-                              FROM ranked_transfers
-                              WHERE row_no = 1)
+           token_owners AS (SELECT token_id,
+                                   to_address AS owner
+                            FROM ranked_transfers
+                            WHERE row_no = 1)
 
-        SELECT owner,
-               SUM(incentives) AS total
-        FROM strk_defi_spring_incentives
-                 JOIN token_owners ON token_id = salt
-            AND day >= $1 AND day < $2
-        GROUP BY owner
-    `,
+      SELECT owner,
+             SUM(incentives) AS total
+      FROM strk_defi_spring_incentives
+               JOIN token_owners ON token_id = salt
+          AND day >= $1 AND day < $2
+      GROUP BY owner
+  `,
 });
 await client.query("COMMIT;");
 
@@ -109,7 +109,6 @@ const claimsWithHashes: { claim: Claim; hash: bigint }[] = rewardsRaw
     owner: BigInt(owner),
     total: BigInt(Math.floor(Number(total) * 1e18)),
   }))
-  .filter(({ total }) => total >= 10n ** 18n)
   .sort(({ total: a }, { total: b }) => Number(b - a))
   .map(({ total, owner }, ix) => ({ id: ix, claimee: owner, amount: total }))
   .map((claim) => ({ claim, hash: computeClaimHash(claim) }));

@@ -2,7 +2,7 @@
   "name": "defi-spring",
   "version": "1.0.0",
   "scripts": {
-    "start": "tsx index.ts",
+    "compute-distributions": "tsx compute-distributions.ts",
     "create-root": "tsx create-root.ts"
   },
   "author": "Moody Salem",

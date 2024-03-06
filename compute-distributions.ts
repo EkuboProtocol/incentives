@@ -399,7 +399,7 @@ for (const date of dates) {
                                                         JOIN pairs ON ppopr.token0 = pairs.token0 AND ppopr.token1 = pairs.token1);
   `;
 
-  console.log("Executing query", queryText);
+  console.debug("Executing query", queryText);
 
   await client.query(`BEGIN;`);
   await client.query(queryText);

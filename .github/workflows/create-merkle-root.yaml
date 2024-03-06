@@ -27,7 +27,7 @@ jobs:
 
       - run: npm install
 
-      - name: Update table
+      - name: Create merkle root
         env:
           PGHOST: ${{ secrets.POSTGRES_HOST }}
           PGPORT: ${{ secrets.POSTGRES_PORT }}

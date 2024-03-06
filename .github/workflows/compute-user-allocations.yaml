@@ -25,7 +25,7 @@ jobs:
 
       - run: npm install
 
-      - name: Update table
+      - name: Compute distributions
         env:
           PGHOST: ${{ secrets.POSTGRES_HOST }}
           PGPORT: ${{ secrets.POSTGRES_PORT }}
@@ -33,4 +33,4 @@ jobs:
           PGUSER: ${{ secrets.POSTGRES_USERNAME }}
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           RUN_DATES: ${{ inputs.run_dates }}
-        run: npm start
+        run: npm run compute-distributions
