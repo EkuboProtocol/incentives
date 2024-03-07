@@ -109,6 +109,7 @@ const claimsWithHashes: { claim: Claim; hash: bigint }[] = rewardsRaw
     owner: BigInt(owner),
     total: BigInt(Math.floor(Number(total) * 1e18)),
   }))
+  .filter(({ total }) => total >= 10n ** 18n)
   .sort(({ total: a }, { total: b }) => Number(b - a))
   .map(({ total, owner }, ix) => ({ id: ix, claimee: owner, amount: total }))
   .map((claim) => ({ claim, hash: computeClaimHash(claim) }));
