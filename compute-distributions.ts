@@ -41,32 +41,6 @@ for (const date of dates) {
 
   const queryDate = `'${date}T00:00:00Z'`;
 
-  const pairData: {
-    token0: { l2_token_address: string; symbol: string };
-    token1: { l2_token_address: string; symbol: string };
-    allocation: number;
-    volatility_in_ticks: number;
-  }[] = incentiveData.pairs.map(({ token0, token1, allocations }) => {
-    const dayData = allocations?.find((a) => a.date === date);
-    if (!dayData)
-      throw new Error(`Missing day data for ${token0.symbol}/${token1.symbol}`);
-    return {
-      token0: {
-        l2_token_address: token0.l2_token_address,
-        symbol: token0.symbol,
-      },
-      token1: {
-        l2_token_address: token1.l2_token_address,
-        symbol: token1.symbol,
-      },
-      allocation: dayData.allocation,
-      volatility_in_ticks: Math.round(
-        Math.log(1 + dayData.thirty_day_realized_volatility) /
-          Math.log(1.000001)
-      ),
-    };
-  });
-
   console.log("Querying for volatility");
 
   const { rows: volatilityData } = await client.query<{
@@ -118,7 +92,7 @@ for (const date of dates) {
                    int4(FLOOR(LOG(EXP(realized_volatility)) / LOG(1.000001::NUMERIC))) AS volatility_in_ticks
             FROM realized_volatility_by_pair
             WHERE (token0, token1) IN (
-                ${pairData
+                ${incentiveData.pairs
                   .map(
                     (p) =>
                       `(${p.token0.l2_token_address}::numeric, ${p.token1.l2_token_address}::numeric)`
@@ -129,22 +103,51 @@ for (const date of dates) {
     values: [queryDate],
   });
 
+  const pairData: {
+    token0: { l2_token_address: string; symbol: string };
+    token1: { l2_token_address: string; symbol: string };
+    allocation: number;
+    volatility_in_ticks: number;
+  }[] = incentiveData.pairs.map(({ token0, token1, allocations }) => {
+    const dayData = allocations?.find((a) => a.date === date);
+    if (!dayData)
+      throw new Error(`Missing day data for ${token0.symbol}/${token1.symbol}`);
+
+    const volatility_in_ticks = volatilityData.find(
+      (vd) =>
+        BigInt(vd.token0) === BigInt(token0.l2_token_address) &&
+        BigInt(vd.token1) === BigInt(token1.l2_token_address)
+    )?.volatility_in_ticks;
+
+    if (!volatility_in_ticks)
+      throw new Error(
+        `Missing volatility data for ${token0.symbol}/${token1.symbol}`
+      );
+
+    return {
+      token0: {
+        l2_token_address: token0.l2_token_address,
+        symbol: token0.symbol,
+      },
+      token1: {
+        l2_token_address: token1.l2_token_address,
+        symbol: token1.symbol,
+      },
+      allocation: dayData.allocation,
+      volatility_in_ticks,
+    };
+  });
+
   const pairDataValuesTable = pairData
     .map(
       (p) =>
         `(${BigInt(p.token0.l2_token_address)}::NUMERIC, ${BigInt(
           p.token1.l2_token_address
-        )}::NUMERIC, ${p.allocation}::NUMERIC, ${
-          volatilityData.find(
-            (vd) =>
-              BigInt(vd.token0) === BigInt(p.token0.l2_token_address) &&
-              BigInt(vd.token1) === BigInt(p.token1.l2_token_address)
-          )?.volatility_in_ticks ?? p.volatility_in_ticks
-        }::INT)`
+        )}::NUMERIC, ${p.allocation}::NUMERIC, ${p.volatility_in_ticks}::INT)`
     )
     .join("\n,");
 
-  console.log("Using data", date, volatilityData, pairData);
+  console.log("Using pair data", date, pairData);
 
   const standardDeviationWeights = [
     { multiple: 0.03, weight: 0.024 },
