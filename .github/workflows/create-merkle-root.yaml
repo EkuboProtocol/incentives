@@ -1,14 +1,14 @@
 name: Create merkle root
 
 on:
-  schedule:
-    - cron: '0 2 7,21 3 *'
   workflow_dispatch:
     inputs:
       start_date:
+        required: true
         description: 'The ISO format start date of the date range for which to compute the merkle root'
       end_date:
-        description: 'The ISO format end date of the date range for which to compute the merkle root'
+        required: true
+        description: 'The ISO format end date of the date range for which to compute the merkle root, exclusive'
 
 concurrency: query
 
