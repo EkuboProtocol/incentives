@@ -40,8 +40,7 @@ await client.query(`
     (
         address NUMERIC NOT NULL PRIMARY KEY,
         token   NUMERIC NOT NULL,
-        drop_id INT REFERENCES generated_drop (id) ON DELETE CASCADE,
-        funded  BOOLEAN NOT NULL
+        drop_id INT REFERENCES generated_drop (id) ON DELETE CASCADE
     );
 `);
 
