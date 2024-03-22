@@ -49,8 +49,8 @@ for (const date of dates) {
     volatility_in_ticks: number;
   }>({
     text: `
-            WITH times AS (SELECT $1::timestamptz                      AS end,
-                                  $1::timestamptz - INTERVAL '14 days' AS start),
+            WITH times AS (SELECT $1::timestamptz + INTERVAL '1 days'  AS end,
+                                  $1::timestamptz - INTERVAL '27 days' AS start),
 
                  prices AS (SELECT pk.token0,
                                    pk.token1,
@@ -113,16 +113,21 @@ for (const date of dates) {
     if (!dayData)
       throw new Error(`Missing day data for ${token0.symbol}/${token1.symbol}`);
 
-    const volatility_in_ticks = volatilityData.find(
+    let volatility_in_ticks = volatilityData.find(
       (vd) =>
         BigInt(vd.token0) === BigInt(token0.l2_token_address) &&
         BigInt(vd.token1) === BigInt(token1.l2_token_address)
     )?.volatility_in_ticks;
 
-    if (!volatility_in_ticks)
-      throw new Error(
-        `Missing volatility data for ${token0.symbol}/${token1.symbol}`
+    if (!volatility_in_ticks) {
+      console.log(
+        `Missing volatility data for ${token0.symbol}/${token1.symbol}, falling back to API data`
       );
+      volatility_in_ticks = Math.round(
+        Math.log(Math.exp(dayData.thirty_day_realized_volatility)) /
+          Math.log(1.000001)
+      );
+    }
 
     return {
       token0: {
