@@ -39,109 +39,59 @@ console.log("Schema initialized");
 for (const date of dates) {
   console.log("Starting processing for date", date);
 
-  const queryDate = `'${date}T00:00:00Z'`;
-
-  console.log("Querying for volatility");
-
-  const { rows: volatilityData } = await client.query<{
-    token0: string;
-    token1: string;
-    volatility_in_ticks: number;
-  }>({
-    text: `
-            WITH times AS (SELECT $1::timestamptz + INTERVAL '1 days'  AS end,
-                                  $1::timestamptz - INTERVAL '27 days' AS start),
-
-                 prices AS (SELECT pk.token0,
-                                   pk.token1,
-                                   date_bin(INTERVAL '1 hour', b.time,
-                                            '2000-01-01 00:00:00'::TIMESTAMP WITHOUT TIME ZONE) AS period_start,
-                                   SUM(delta1 * delta1) / SUM(ABS(delta1 * delta0))             AS price
-                            FROM swaps s
-                                     JOIN event_keys ek ON s.event_id = ek.id
-                                     JOIN blocks b ON ek.block_number = b.number
-                                     JOIN pool_keys pk ON s.pool_key_hash = pk.key_hash,
-                                 times t
-                            WHERE b.time >= t.start
-                              AND b.time < t.end
-                              AND delta1 != 0
-                              AND delta0 != 0
-                            GROUP BY pk.token0, pk.token1, period_start),
-
-                 log_price_changes AS (SELECT token0,
-                                              token1,
-                                              LN(price) -
-                                              LN(COALESCE(
-                                                              LAG(price) OVER (PARTITION BY token0, token1 ORDER BY period_start),
-                                                              price))                                   AS price_change,
-                                              EXTRACT(HOURS FROM period_start - COALESCE(LAG(period_start)
-                                                                                         OVER (PARTITION BY token0, token1 ORDER BY period_start),
-                                                                                         period_start)) AS hours_since_last
-                                       FROM prices p,
-                                            times t
-                                       ORDER BY period_start),
-
-                 realized_volatility_by_pair AS (SELECT token0,
-                                                        token1,
-                                                        STDDEV(lpc.price_change) * SQRT(SUM(hours_since_last)) AS realized_volatility
-                                                 FROM log_price_changes lpc
-                                                 GROUP BY token0, token1)
-
-            SELECT token0,
-                   token1,
-                   int4(FLOOR(LOG(EXP(realized_volatility)) / LOG(1.000001::NUMERIC))) AS volatility_in_ticks
-            FROM realized_volatility_by_pair
-            WHERE (token0, token1) IN (
-                ${incentiveData.pairs
-                  .map(
-                    (p) =>
-                      `(${p.token0.l2_token_address}::numeric, ${p.token1.l2_token_address}::numeric)`
-                  )
-                  .join(", ")}
-                );
-        `,
-    values: [queryDate],
-  });
+  const isoFormattedDate = `${date}T00:00:00Z`;
 
   const pairData: {
     token0: { l2_token_address: string; symbol: string };
     token1: { l2_token_address: string; symbol: string };
     allocation: number;
     volatility_in_ticks: number;
-  }[] = incentiveData.pairs.map(({ token0, token1, allocations }) => {
-    const dayData = allocations?.find((a) => a.date === date);
-    if (!dayData)
-      throw new Error(`Missing day data for ${token0.symbol}/${token1.symbol}`);
+  }[] = await Promise.all(
+    incentiveData.pairs.map(async ({ token0, token1, allocations }) => {
+      const dayData = allocations?.find((a) => a.date === date);
+      if (!dayData)
+        throw new Error(
+          `Missing day data for ${token0.symbol}/${token1.symbol}`
+        );
 
-    let volatility_in_ticks = volatilityData.find(
-      (vd) =>
-        BigInt(vd.token0) === BigInt(token0.l2_token_address) &&
-        BigInt(vd.token1) === BigInt(token1.l2_token_address)
-    )?.volatility_in_ticks;
-
-    if (!volatility_in_ticks) {
-      console.log(
-        `Missing volatility data for ${token0.symbol}/${token1.symbol}, falling back to API data`
+      const datePlusOne = new Date(
+        new Date(isoFormattedDate).getTime() + 86_400_000
       );
-      volatility_in_ticks = Math.round(
-        Math.log(Math.exp(dayData.thirty_day_realized_volatility)) /
-          Math.log(1.000001)
-      );
-    }
 
-    return {
-      token0: {
-        l2_token_address: token0.l2_token_address,
-        symbol: token0.symbol,
-      },
-      token1: {
-        l2_token_address: token1.l2_token_address,
-        symbol: token1.symbol,
-      },
-      allocation: dayData.allocation,
-      volatility_in_ticks,
-    };
-  });
+      const volatilityResponse = await fetch(
+        `https://mainnet-api.ekubo.org/volatility/${token0.l2_token_address}/${
+          token1.l2_token_address
+        }?numDays=30&fromDate=${datePlusOne.toISOString()}`
+      );
+
+      const volatilityData = await volatilityResponse.json();
+
+      let volatility_in_ticks = volatilityData?.volatility?.ticks;
+
+      if (!volatility_in_ticks) {
+        console.log(
+          `Missing volatility data for ${token0.symbol}/${token1.symbol}, falling back to OBL day level data`
+        );
+        volatility_in_ticks = Math.round(
+          Math.log(Math.exp(dayData.thirty_day_realized_volatility)) /
+            Math.log(1.000001)
+        );
+      }
+
+      return {
+        token0: {
+          l2_token_address: token0.l2_token_address,
+          symbol: token0.symbol,
+        },
+        token1: {
+          l2_token_address: token1.l2_token_address,
+          symbol: token1.symbol,
+        },
+        allocation: dayData.allocation,
+        volatility_in_ticks,
+      };
+    })
+  );
 
   const pairDataValuesTable = pairData
     .map(
@@ -188,11 +138,11 @@ for (const date of dates) {
 
   const priceInterval = "1 hour";
 
-  // first delete everything for the day
+  // first delete all the data for the day
   await client.query(
     `DELETE
          FROM strk_defi_spring_incentives
-         WHERE day = ${queryDate}::timestamptz;`
+         WHERE day = '${isoFormattedDate}'::timestamptz;`
   );
 
   const queryText = `
@@ -202,7 +152,7 @@ for (const date of dates) {
                                                                       FROM event_keys
                                                                       WHERE block_number >= (SELECT number
                                                                                              FROM blocks
-                                                                                             WHERE time >= ${queryDate}::timestamptz
+                                                                                             WHERE time >= '${isoFormattedDate}'::timestamptz
                                                                                              ORDER BY number
                                                                                              LIMIT 1)
                                                                       ORDER BY id
@@ -213,7 +163,7 @@ for (const date of dates) {
                                                                       FROM event_keys
                                                                       WHERE block_number <= (SELECT number
                                                                                              FROM blocks
-                                                                                             WHERE time < (${queryDate}::timestamptz + INTERVAL '1 day')
+                                                                                             WHERE time < ('${isoFormattedDate}'::timestamptz + INTERVAL '1 day')
                                                                                              ORDER BY number DESC
                                                                                              LIMIT 1)
                                                                       ORDER BY id DESC
@@ -261,7 +211,7 @@ for (const date of dates) {
                                                                                      WHERE block_number >=
                                                                                            (SELECT number
                                                                                             FROM blocks
-                                                                                            WHERE time >= ${queryDate}::timestamptz - (4 * INTERVAL '${priceInterval}')
+                                                                                            WHERE time >= '${isoFormattedDate}'::timestamptz - (4 * INTERVAL '${priceInterval}')
                                                                                             ORDER BY number
                                                                                             LIMIT 1)
                                                                                      ORDER BY id
@@ -316,7 +266,7 @@ for (const date of dates) {
                                                                     pu.upper_bound,
                                                                     pu.liquidity_delta,
                                                                     -- pretend like the position was updated at the very beginning of the period
-                                                                    ${queryDate}::timestamptz AS update_time
+                                                                    '${isoFormattedDate}'::timestamptz AS update_time
                                                              FROM positions_created_before_start_with_nonzero_liquidity pu
                                                              UNION ALL
                                                              SELECT pu.event_id  update_event_id,
@@ -369,10 +319,10 @@ for (const date of dates) {
                                                                                         LEAST(
                                                                                                 COALESCE(
                                                                                                         psdp.next_update_time,
-                                                                                                        (${queryDate}::timestamptz + INTERVAL '1 day')),
+                                                                                                        ('${isoFormattedDate}'::timestamptz + INTERVAL '1 day')),
                                                                                                 COALESCE(
                                                                                                         ipp.next_period_start,
-                                                                                                        (${queryDate}::timestamptz + INTERVAL '1 day'))) -
+                                                                                                        ('${isoFormattedDate}'::timestamptz + INTERVAL '1 day'))) -
                                                                                         GREATEST(psdp.update_time, ipp.period_start)
                                                                                         )
                                                                                      ), 0)
@@ -471,7 +421,7 @@ for (const date of dates) {
 
                                                  SELECT locker,
                                                         salt,
-                                                        ${queryDate}::timestamptz                     AS day,
+                                                        '${isoFormattedDate}'::timestamptz                     AS day,
                                                         (position_rewards_share * pairs.strk_rewards) AS incentives,
                                                         NOW()                                         AS last_updated
                                                  FROM position_percent_of_pair_rewards ppopr
