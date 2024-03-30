@@ -20,6 +20,8 @@ const dates = process.env.RUN_DATES?.length
   ? process.env.RUN_DATES.split(",")
   : [new Date(Date.now() - 86_400_000).toISOString().split("T")[0]];
 
+const overwrite = process.env.OVERWRITE === "true";
+
 const client = new pg.Client();
 
 await client.connect();
@@ -37,9 +39,24 @@ await client.query(`CREATE TABLE IF NOT EXISTS strk_defi_spring_incentives
 console.log("Schema initialized");
 
 for (const date of dates) {
-  console.log("Starting processing for date", date);
-
   const isoFormattedDate = `${date}T00:00:00Z`;
+
+  if (!overwrite) {
+    const { rows } = await client.query<{ exists: 1 }>(
+      `SELECT 1 AS exists
+       FROM strk_defi_spring_incentives
+       WHERE day = '${isoFormattedDate}'
+       LIMIT 1`
+    );
+    if (rows.length) {
+      console.log(
+        `Skipping ${date} because data exists. To process anyway, set OVERWRITE to true`
+      );
+      continue;
+    }
+  }
+
+  console.log("Starting processing for date", date);
 
   const pairData: {
     token0: { l2_token_address: string; symbol: string };
