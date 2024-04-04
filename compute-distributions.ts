@@ -202,7 +202,8 @@ for (const date of dates) {
                                                                       JOIN pairs
                                                                            ON pairs.token0 = pool_keys.token0 AND
                                                                               pairs.token1 = pool_keys.token1 AND
-                                                                              extension = 0),
+                                                                              -- no extension or twamm extension
+                                                                              extension in (0, 0x043e4f09c32d13d43a880e85f69f7de93ceda62d6cf2581a582c6db635548fdc::numeric)),
 
                                                      interval_pair_prices_without_next_start
                                                          AS (SELECT pool_keys.token0,
