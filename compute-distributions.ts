@@ -210,8 +210,9 @@ for (const date of dates) {
                                                                     JOIN pairs
                                                                          ON pairs.token0 = pool_keys.token0 AND
                                                                             pairs.token1 = pool_keys.token1 AND
-                                                                            -- no extension or twamm extension
-                                                                              extension in (0, 0x043e4f09c32d13d43a880e85f69f7de93ceda62d6cf2581a582c6db635548fdc::numeric)),
+                                                                             -- no extension or twamm extension
+                                                                            extension IN (0,
+                                                                                          0x043e4f09c32d13d43a880e85f69f7de93ceda62d6cf2581a582c6db635548fdc::NUMERIC)),
 
                                                    interval_pair_prices_without_next_start
                                                        AS (SELECT pool_keys.token0,
@@ -252,9 +253,9 @@ for (const date of dates) {
                                                                                    weight,
                                                                                    INT4RANGE(
                                                                                            CEIL(ipp.tick - multiple * volatility_in_ticks)::INT,
-                                                                                           FLOOR(ipp.tick)::INT)                                                 stddev_range_lower,
+                                                                                           ipp.tick)                                                             stddev_range_lower,
                                                                                    INT4RANGE(
-                                                                                           CEIL(ipp.tick)::INT,
+                                                                                           ipp.tick,
                                                                                            FLOOR(ipp.tick + multiple * volatility_in_ticks)::INT)                stddev_range_upper
                                                                             FROM interval_pair_prices_without_next_start ipp
                                                                                      JOIN pairs ON ipp.token0 = pairs.token0 AND ipp.token1 = pairs.token1
