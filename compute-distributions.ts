@@ -64,51 +64,59 @@ for (const date of dates) {
     allocation: number;
     volatility_in_ticks: number;
   }[] = await Promise.all(
-    incentiveData.pairs.map(async ({ token0, token1, allocations }) => {
-      const dayData = allocations?.find((a) => a.date === date);
-      if (!dayData)
-        throw new Error(
-          `Missing day data for ${token0.symbol}/${token1.symbol}`
+    incentiveData.pairs
+      .filter((p) => p.allocations.find((a) => a.date === date))
+      .map(async ({ token0, token1, allocations }) => {
+        const dayData = allocations?.find((a) => a.date === date);
+        if (!dayData)
+          throw new Error(
+            `Missing day data for ${token0.symbol}/${token1.symbol}`
+          );
+
+        const datePlusOne = new Date(
+          new Date(isoFormattedDate).getTime() + 86_400_000
         );
 
-      const datePlusOne = new Date(
-        new Date(isoFormattedDate).getTime() + 86_400_000
-      );
-
-      const volatilityResponse = await fetch(
-        `https://mainnet-api.ekubo.org/volatility/${token0.l2_token_address}/${
-          token1.l2_token_address
-        }?numDays=30&fromDate=${datePlusOne.toISOString()}`
-      );
-
-      const volatilityData = await volatilityResponse.json();
-
-      let volatility_in_ticks = volatilityData?.volatility?.ticks;
-
-      if (!volatility_in_ticks) {
-        console.log(
-          `Missing volatility data for ${token0.symbol}/${token1.symbol}, falling back to OBL day level data`
+        const volatilityResponse = await fetch(
+          `https://mainnet-api.ekubo.org/volatility/${
+            token0.l2_token_address
+          }/${
+            token1.l2_token_address
+          }?numDays=30&fromDate=${datePlusOne.toISOString()}`
         );
-        volatility_in_ticks = Math.round(
-          Math.log(Math.exp(dayData.thirty_day_realized_volatility)) /
-            Math.log(1.000001)
-        );
-      }
 
-      return {
-        token0: {
-          l2_token_address: token0.l2_token_address,
-          symbol: token0.symbol,
-        },
-        token1: {
-          l2_token_address: token1.l2_token_address,
-          symbol: token1.symbol,
-        },
-        allocation: dayData.allocation,
-        volatility_in_ticks,
-      };
-    })
+        const volatilityData = await volatilityResponse.json();
+
+        let volatility_in_ticks = volatilityData?.volatility?.ticks;
+
+        if (!volatility_in_ticks) {
+          console.log(
+            `Missing volatility data for ${token0.symbol}/${token1.symbol}, falling back to OBL day level data`
+          );
+          volatility_in_ticks = Math.round(
+            Math.log(Math.exp(dayData.thirty_day_realized_volatility)) /
+              Math.log(1.000001)
+          );
+        }
+
+        return {
+          token0: {
+            l2_token_address: token0.l2_token_address,
+            symbol: token0.symbol,
+          },
+          token1: {
+            l2_token_address: token1.l2_token_address,
+            symbol: token1.symbol,
+          },
+          allocation: dayData.allocation,
+          volatility_in_ticks,
+        };
+      })
   );
+
+  if (!pairData.length) {
+    throw new Error(`No pair data found for date: ${date}`);
+  }
 
   const pairDataValuesTable = pairData
     .map(
@@ -202,7 +210,8 @@ for (const date of dates) {
                                                                     JOIN pairs
                                                                          ON pairs.token0 = pool_keys.token0 AND
                                                                             pairs.token1 = pool_keys.token1 AND
-                                                                            extension = 0),
+                                                                            -- no extension or twamm extension
+                                                                              extension in (0, 0x043e4f09c32d13d43a880e85f69f7de93ceda62d6cf2581a582c6db635548fdc::numeric)),
 
                                                    interval_pair_prices_without_next_start
                                                        AS (SELECT pool_keys.token0,
