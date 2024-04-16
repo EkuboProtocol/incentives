@@ -375,24 +375,6 @@ for (const date of dates) {
 
                                                                   COALESCE((CASE
                                                                                 WHEN tick < LOWER(tick_range_intersection_lower)
-                                                                                    THEN FLOOR(
-                                                                                        liquidity *
-                                                                                        ((1::NUMERIC /
-                                                                                          POWER(1.0000005::NUMERIC, LOWER(tick_range_intersection_lower))) -
-                                                                                         (1::NUMERIC /
-                                                                                          POWER(1.0000005::NUMERIC, UPPER(tick_range_intersection_lower)))))
-                                                                                WHEN tick < UPPER(tick_range_intersection_lower)
-                                                                                    THEN FLOOR(
-                                                                                        liquidity *
-                                                                                        ((1::NUMERIC / POWER(1.0000005::NUMERIC, tick)) -
-                                                                                         (1::NUMERIC /
-                                                                                          POWER(1.0000005::NUMERIC, UPPER(tick_range_intersection_lower)))))
-                                                                                ELSE 0 END) *
-                                                                           price,
-                                                                           0)   AS amount0_in_terms_of_amount1_lower,
-
-                                                                  COALESCE((CASE
-                                                                                WHEN tick < LOWER(tick_range_intersection_lower)
                                                                                     THEN 0
                                                                                 WHEN tick < UPPER(tick_range_intersection_lower)
                                                                                     THEN FLOOR(
@@ -418,22 +400,8 @@ for (const date of dates) {
                                                                                         ((1::NUMERIC / POWER(1.0000005::NUMERIC, tick)) -
                                                                                          (1::NUMERIC /
                                                                                           POWER(1.0000005::NUMERIC, UPPER(tick_range_intersection_upper)))))
-                                                                                ELSE 0 END) *
-                                                                           price,
-                                                                           0)   AS amount0_in_terms_of_amount1_upper,
-
-                                                                  COALESCE((CASE
-                                                                                WHEN tick < LOWER(tick_range_intersection_upper)
-                                                                                    THEN 0
-                                                                                WHEN tick < UPPER(tick_range_intersection_upper)
-                                                                                    THEN FLOOR(
-                                                                                        liquidity *
-                                                                                        (POWER(1.0000005::NUMERIC, tick) -
-                                                                                         POWER(1.0000005::NUMERIC, LOWER(tick_range_intersection_upper))))
-                                                                                ELSE FLOOR(liquidity *
-                                                                                           (POWER(1.0000005::NUMERIC, UPPER(tick_range_intersection_upper)) -
-                                                                                            POWER(1.0000005::NUMERIC, LOWER(tick_range_intersection_upper)))) END),
-                                                                           0)   AS amount1_upper,
+                                                                                ELSE 0 END),
+                                                                           0)   AS amount0_upper,
 
                                                                   row_seconds,
                                                                   weight
@@ -446,12 +414,12 @@ for (const date of dates) {
                                                                                      locker,
                                                                                      salt,
                                                                                      SUM(
-                                                                                             (amount0_in_terms_of_amount1_lower + amount1_lower) *
+                                                                                             amount0_upper *
                                                                                              row_seconds *
                                                                                              weight
                                                                                      ) AS market_depth_score_lower,
                                                                                      SUM(
-                                                                                             (amount0_in_terms_of_amount1_upper + amount1_upper) *
+                                                                                             amount1_lower *
                                                                                              row_seconds *
                                                                                              weight
                                                                                      ) AS market_depth_score_upper
