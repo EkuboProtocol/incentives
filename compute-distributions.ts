@@ -373,35 +373,24 @@ for (const date of dates) {
                                                                   locker,
                                                                   salt,
 
-                                                                  COALESCE((CASE
-                                                                                WHEN tick < LOWER(tick_range_intersection_lower)
-                                                                                    THEN 0
-                                                                                WHEN tick < UPPER(tick_range_intersection_lower)
-                                                                                    THEN FLOOR(
-                                                                                        liquidity *
-                                                                                        (POWER(1.0000005::NUMERIC, tick) -
-                                                                                         POWER(1.0000005::NUMERIC, LOWER(tick_range_intersection_lower))))
-                                                                                ELSE FLOOR(liquidity *
-                                                                                           (POWER(1.0000005::NUMERIC, UPPER(tick_range_intersection_lower)) -
-                                                                                            POWER(1.0000005::NUMERIC, LOWER(tick_range_intersection_lower)))) END),
-                                                                           0)   AS amount1_lower,
+                                                                  (CASE
+                                                                       WHEN ISEMPTY(tick_range_intersection_lower)
+                                                                           THEN 0
+                                                                       ELSE FLOOR(liquidity *
+                                                                                  (POWER(1.0000005::NUMERIC, UPPER(tick_range_intersection_lower)) -
+                                                                                   POWER(1.0000005::NUMERIC, LOWER(tick_range_intersection_lower))))
+                                                                      END)      AS amount1_lower,
 
-                                                                  COALESCE((CASE
-                                                                                WHEN tick < LOWER(tick_range_intersection_upper)
-                                                                                    THEN FLOOR(
-                                                                                        liquidity *
-                                                                                        ((1::NUMERIC /
-                                                                                          POWER(1.0000005::NUMERIC, LOWER(tick_range_intersection_upper))) -
-                                                                                         (1::NUMERIC /
-                                                                                          POWER(1.0000005::NUMERIC, UPPER(tick_range_intersection_upper)))))
-                                                                                WHEN tick < UPPER(tick_range_intersection_upper)
-                                                                                    THEN FLOOR(
-                                                                                        liquidity *
-                                                                                        ((1::NUMERIC / POWER(1.0000005::NUMERIC, tick)) -
-                                                                                         (1::NUMERIC /
-                                                                                          POWER(1.0000005::NUMERIC, UPPER(tick_range_intersection_upper)))))
-                                                                                ELSE 0 END),
-                                                                           0)   AS amount0_upper,
+                                                                  (CASE
+                                                                       WHEN ISEMPTY(tick_range_intersection_upper)
+                                                                           THEN 0
+                                                                       ELSE FLOOR(
+                                                                               liquidity *
+                                                                               ((1::NUMERIC /
+                                                                                 POWER(1.0000005::NUMERIC, LOWER(tick_range_intersection_upper))) -
+                                                                                (1::NUMERIC /
+                                                                                 POWER(1.0000005::NUMERIC, UPPER(tick_range_intersection_upper)))))
+                                                                      END)      AS amount0_upper,
 
                                                                   row_seconds,
                                                                   weight
