@@ -39,7 +39,7 @@ jobs:
           PGDATABASE: ${{ secrets.POSTGRES_DB }}
           PGUSER: ${{ secrets.POSTGRES_USERNAME }}
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          PGSSLMODE: prefer
+          PGSSLMODE: require
           NODE_TLS_REJECT_UNAUTHORIZED: 0
           RUN_DATES: ${{ inputs.run_dates }}
           OVERWRITE: ${{ inputs.overwrite }}
