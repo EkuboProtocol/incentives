@@ -34,6 +34,7 @@ jobs:
           PGDATABASE: ${{ secrets.POSTGRES_DB }}
           PGUSER: ${{ secrets.POSTGRES_USERNAME }}
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          PGSSLMODE: prefer
           START_DATE: ${{ inputs.start_date }}
           END_DATE: ${{ inputs.end_date }}
         run: npm run create-root
