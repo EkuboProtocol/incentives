@@ -12,7 +12,11 @@ const startDate = process.env.START_DATE
 if (endDate.getTime() <= startDate.getTime())
   throw new Error("END_DATE must be greater than START_DATE");
 
-const client = new pg.Client();
+const client = new pg.Client({
+  ssl: {
+    rejectUnauthorized: false,
+  },
+});
 await client.connect();
 
 await client.query(`

@@ -22,7 +22,11 @@ const dates = process.env.RUN_DATES?.length
 
 const overwrite = process.env.OVERWRITE === "true";
 
-const client = new pg.Client();
+const client = new pg.Client({
+  ssl: {
+    rejectUnauthorized: false,
+  },
+});
 
 await client.connect();
 
