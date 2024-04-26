@@ -40,6 +40,7 @@ jobs:
           PGUSER: ${{ secrets.POSTGRES_USERNAME }}
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           PGSSLMODE: prefer
+          NODE_TLS_REJECT_UNAUTHORIZED: 0
           RUN_DATES: ${{ inputs.run_dates }}
           OVERWRITE: ${{ inputs.overwrite }}
         run: npm run compute-distributions
