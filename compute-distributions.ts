@@ -1,4 +1,4 @@
-import pg from "pg";
+import client from "./client.js";
 
 const incentiveDataResponse = await fetch(
   "https://mainnet-api.ekubo.org/defi-spring-incentives"
@@ -22,14 +22,7 @@ const dates = process.env.RUN_DATES?.length
 
 const overwrite = process.env.OVERWRITE === "true";
 
-const client = new pg.Client({
-  ssl: {
-    rejectUnauthorized: false,
-  },
-});
-
 await client.connect();
-
 await client.query(`CREATE TABLE IF NOT EXISTS strk_defi_spring_incentives
                     (
                         locker       NUMERIC     NOT NULL,
@@ -48,9 +41,9 @@ for (const date of dates) {
   if (!overwrite) {
     const { rows } = await client.query<{ exists: 1 }>(
       `SELECT 1 AS exists
-       FROM strk_defi_spring_incentives
-       WHERE day = '${isoFormattedDate}'
-       LIMIT 1`
+             FROM strk_defi_spring_incentives
+             WHERE day = '${isoFormattedDate}'
+             LIMIT 1`
     );
     if (rows.length) {
       console.log(
