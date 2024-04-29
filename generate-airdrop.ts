@@ -9,7 +9,7 @@ await client.connect();
 await client.query(`BEGIN;`);
 const { rows: claimData } = await client.query<{
   owner: string;
-  numTokens: string;
+  amount: string;
 }>({
   text: `
       WITH stats AS (SELECT SUM(POWER(l2.total_points::NUMERIC, $1::NUMERIC)) AS all_user_total
@@ -24,8 +24,8 @@ const { rows: claimData } = await client.query<{
                                          stats s
                                     WHERE l1.collector NOT IN
                                           (0x3f60afe30844f556ac1c674678ac4447840b1c6c26854a2df6a8a3d2c015610))
-      SELECT pbc.collector                                               AS owner,
-             FLOOR((pbc.percent * :num_tokens::NUMERIC) * 1e18::NUMERIC) AS amount
+      SELECT pbc.collector                                      AS owner,
+             FLOOR((pbc.percent * $2::NUMERIC) * 1e18::NUMERIC) AS amount
       FROM percent_by_collector pbc
       ORDER BY rank
   `,
@@ -35,8 +35,8 @@ await client.query(`COMMIT;`);
 
 await generateDrop(
   claimData.map((c) => ({
-    amount: BigInt(c.numTokens),
     claimee: BigInt(c.owner),
+    amount: BigInt(c.amount),
   })),
   new Date("2023-09-14T00:00:00Z"),
   new Date()
