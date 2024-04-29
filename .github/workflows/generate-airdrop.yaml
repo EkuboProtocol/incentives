@@ -1,0 +1,43 @@
+name: Generate airdrop
+
+on:
+  workflow_dispatch:
+    inputs:
+      power:
+        required: true
+        default: '1.000001'
+        description: 'The power that makes this drop super-linear'
+      num_tokens:
+        required: true
+        default: '2000000'
+        description: 'The total number of tokens distributed'
+
+concurrency: drop
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    name: Run
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm install
+
+      - name: Create drop
+        env:
+          PGHOST: ${{ secrets.POSTGRES_HOST }}
+          PGPORT: ${{ secrets.POSTGRES_PORT }}
+          PGDATABASE: ${{ secrets.POSTGRES_DB }}
+          PGUSER: ${{ secrets.POSTGRES_USERNAME }}
+          PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          PGSSLMODE: require
+          NODE_TLS_REJECT_UNAUTHORIZED: 0
+          POWER: ${{ inputs.power }}
+          NUM_TOKENS: ${{ inputs.num_tokens }}
+        run: npm run generate-airdrop
