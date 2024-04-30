@@ -9,8 +9,8 @@ on:
         description: 'The power that makes this drop super-linear'
       num_tokens:
         required: true
-        default: '2000000'
-        description: 'The total number of tokens distributed'
+        default: '3333333333333333333333333'
+        description: 'The total raw number of tokens distributed'
 
 concurrency: drop
 
