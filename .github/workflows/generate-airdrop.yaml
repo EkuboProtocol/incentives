@@ -2,15 +2,6 @@ name: Generate airdrop
 
 on:
   workflow_dispatch:
-    inputs:
-      power:
-        required: true
-        default: '1.000001'
-        description: 'The power that makes this drop super-linear'
-      num_tokens:
-        required: true
-        default: '3333333333333333333333333'
-        description: 'The total raw number of tokens distributed'
 
 concurrency: drop
 
@@ -38,6 +29,4 @@ jobs:
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           PGSSLMODE: require
           NODE_TLS_REJECT_UNAUTHORIZED: 0
-          POWER: ${{ inputs.power }}
-          NUM_TOKENS: ${{ inputs.num_tokens }}
         run: npm run generate-airdrop
