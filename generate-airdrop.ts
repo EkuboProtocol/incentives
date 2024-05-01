@@ -33,7 +33,9 @@ const { rows: claimData } = await client.query<{
                                                                         0x01C8d2Bb17cdDf22728553c9700ADfBBD42D1999194b409B1188b17191Cc2Efd,
                                                                         0x060d202502c5fF01890Cc70f491aFE85098E962038261Cd3296c80132f4766f6,
                                                                         0x06e87c5bd4e828fa58d12739c6d390f486f02ff73def7ab6c7aee65a25987e63,
-                                                                        0x01a4b773Fd67D167f3f769eb24cFCc86409C106036Efebdd38a9005DE734CD0B
+                                                                        0x01a4b773Fd67D167f3f769eb24cFCc86409C106036Efebdd38a9005DE734CD0B,
+                                                                        0x02Ddb811e7F5CA6891A2bd5e2D09C0a3277C63FA048a3F4c169159E2454890da,
+                                                                        0x029d00828f83f93cee2373f4f6747cc64bab7003f21cd428aacc74e2e2543253
                                                        )
                                                        THEN POWER(l.total_points::NUMERIC, ${TRANSLATOR_POWER}::NUMERIC)
                                                    ELSE
