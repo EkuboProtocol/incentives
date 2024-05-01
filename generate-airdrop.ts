@@ -23,7 +23,8 @@ const { rows: claimData } = await client.query<{
                                                    -- moderators
                                                    WHEN
                                                        l.collector IN (
-                                                           0x02e03baacb2bb218b9f7860e9e3af6fbefa6a9c6efff767936961fe39a9dd91d
+                                                           0x02e03baacb2bb218b9f7860e9e3af6fbefa6a9c6efff767936961fe39a9dd91d,
+                                                           0x04cbf563b6bc061f9ceb67bb70105626a96c9fecb6eec047dbf4266b1502652b
                                                        )
                                                        THEN POWER(l.total_points::NUMERIC, ${MODERATOR_POWER}::NUMERIC)
                                                    -- translators
