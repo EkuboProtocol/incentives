@@ -23,12 +23,18 @@ const { rows: claimData } = await client.query<{
                                                    -- moderators
                                                    WHEN
                                                        l.collector IN (
-                                                           0x02e03baacb2bb218b9f7860e9e3af6fbefa6a9c6efff767936961fe39a9dd91d,
-                                                           0x04cbf563b6bc061f9ceb67bb70105626a96c9fecb6eec047dbf4266b1502652b
-                                                       )
+                                                                       0x02e03baacb2bb218b9f7860e9e3af6fbefa6a9c6efff767936961fe39a9dd91d,
+                                                                       0x04cbf563b6bc061f9ceb67bb70105626a96c9fecb6eec047dbf4266b1502652b
+                                                           )
                                                        THEN POWER(l.total_points::NUMERIC, ${MODERATOR_POWER}::NUMERIC)
                                                    -- translators
-                                                   WHEN l.collector IN (0)
+                                                   WHEN l.collector IN (
+                                                                        0x02e03baacb2bb218b9f7860e9e3af6fbefa6a9c6efff767936961fe39a9dd91d,
+                                                                        0x01C8d2Bb17cdDf22728553c9700ADfBBD42D1999194b409B1188b17191Cc2Efd,
+                                                                        0x060d202502c5fF01890Cc70f491aFE85098E962038261Cd3296c80132f4766f6,
+                                                                        0x06e87c5bd4e828fa58d12739c6d390f486f02ff73def7ab6c7aee65a25987e63,
+                                                                        0x01a4b773Fd67D167f3f769eb24cFCc86409C106036Efebdd38a9005DE734CD0B
+                                                       )
                                                        THEN POWER(l.total_points::NUMERIC, ${TRANSLATOR_POWER}::NUMERIC)
                                                    ELSE
                                                        POWER(l.total_points::NUMERIC, ${BASE_POWER}::NUMERIC)
