@@ -1,4 +1,4 @@
-name: Create merkle root
+name: Create low threshold root
 
 on:
   workflow_dispatch:
