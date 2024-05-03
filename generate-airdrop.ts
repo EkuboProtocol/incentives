@@ -1,5 +1,5 @@
-import client from "./client.js";
 import { generateDrop } from "./generate-drop.js";
+import initializeClient from "./initializeClient.js";
 
 // one-third of total supply
 const NUM_TOKENS = 10n ** 25n / 3n;
@@ -8,7 +8,7 @@ const BASE_POWER = 1.0001;
 const TRANSLATOR_POWER = 1.001;
 const MODERATOR_POWER = 1.01;
 
-await client.connect();
+const client = await initializeClient();
 
 await client.query(`BEGIN;`);
 const { rows: claimData } = await client.query<{
@@ -65,6 +65,7 @@ const { rows: claimData } = await client.query<{
 await client.query(`COMMIT;`);
 
 await generateDrop(
+  client,
   claimData.map((c) => ({
     claimee: BigInt(c.claimee),
     amount: BigInt(c.amount),

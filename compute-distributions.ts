@@ -1,4 +1,4 @@
-import client from "./client.js";
+import initializeClient from "./initializeClient.js";
 
 const incentiveDataResponse = await fetch(
   "https://mainnet-api.ekubo.org/defi-spring-incentives"
@@ -22,18 +22,7 @@ const dates = process.env.RUN_DATES?.length
 
 const overwrite = process.env.OVERWRITE === "true";
 
-await client.connect();
-await client.query(`CREATE TABLE IF NOT EXISTS strk_defi_spring_incentives
-                    (
-                        locker       NUMERIC     NOT NULL,
-                        salt         NUMERIC     NOT NULL,
-                        day          timestamptz NOT NULL,
-                        incentives   NUMERIC     NOT NULL,
-                        last_updated timestamptz NOT NULL,
-                        PRIMARY KEY (locker, salt, day)
-                    );`);
-
-console.log("Schema initialized");
+const client = await initializeClient();
 
 for (const date of dates) {
   const isoFormattedDate = `${date}T00:00:00Z`;

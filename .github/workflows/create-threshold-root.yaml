@@ -1,0 +1,46 @@
+name: Create merkle root
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        required: true
+        description: 'The ISO format start date of the date range for which to compute the merkle root'
+      end_date:
+        required: true
+        description: 'The ISO format end date of the date range for which to compute the merkle root, exclusive'
+      threshold:
+        default: '1'
+        required: false
+        description: 'The threshold that the drop for each period is subjected to that should be bundled up'
+
+concurrency: query
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    name: Run
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm install
+
+      - name: Create low threshold root
+        env:
+          PGHOST: ${{ secrets.POSTGRES_HOST }}
+          PGPORT: ${{ secrets.POSTGRES_PORT }}
+          PGDATABASE: ${{ secrets.POSTGRES_DB }}
+          PGUSER: ${{ secrets.POSTGRES_USERNAME }}
+          PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          PGSSLMODE: require
+          NODE_TLS_REJECT_UNAUTHORIZED: 0
+          START_DATE: ${{ inputs.start_date }}
+          END_DATE: ${{ inputs.end_date }}
+          THRESHOLD: ${{ inputs.threshold }}
+        run: npm run create-below-threshold-root

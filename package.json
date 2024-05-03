@@ -4,6 +4,7 @@
   "scripts": {
     "compute-distributions": "tsx compute-distributions.ts",
     "create-root": "tsx create-root.ts",
+    "create-below-threshold-root": "tsx create-below-threshold-root.ts",
     "generate-airdrop": "tsx generate-airdrop.ts"
   },
   "author": "Moody Salem",
