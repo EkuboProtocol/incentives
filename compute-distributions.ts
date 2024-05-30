@@ -111,13 +111,7 @@ for (const date of dates) {
           p.token1.l2_token_address
         )}::NUMERIC, ${p.allocation}::NUMERIC, ${
           p.volatility_in_ticks
-        }::INT, ${Math.floor(p.volatility_in_ticks / 2500)}::INT, ${
-          BigInt(
-            Math.floor(
-              2 ** 32 * (Math.pow(1.000001, p.volatility_in_ticks / 5000) - 1)
-            )
-          ) << 96n
-        }::NUMERIC)`
+        }::INT, ${Math.floor(p.volatility_in_ticks / 2500)}::INT)`
     )
     .join("\n,");
 
@@ -194,14 +188,12 @@ for (const date of dates) {
                                                                   token1,
                                                                   strk_rewards,
                                                                   volatility_in_ticks,
-                                                                  min_tick_spacing,
-                                                                  min_fee
+                                                                  min_tick_spacing
                                                            FROM (values ${pairDataValuesTable}) AS pairs (token0,
                                                                                                           token1,
                                                                                                           strk_rewards,
                                                                                                           volatility_in_ticks,
-                                                                                                          min_tick_spacing,
-                                                                                                          min_fee)),
+                                                                                                          min_tick_spacing)),
 
                                                    -- the weights corresponding to each multiple of the standard deviation 
                                                    stddev_multiple_weights AS (SELECT multiple, weight
@@ -217,8 +209,7 @@ for (const date of dates) {
                                                                              -- no extension or twamm extension
                                                                             extension IN (0,
                                                                                           0x043e4f09c32d13d43a880e85f69f7de93ceda62d6cf2581a582c6db635548fdc::NUMERIC)
-                                                                             AND tick_spacing >= min_tick_spacing
-                                                                             AND fee >= min_fee),
+                                                                             AND tick_spacing >= min_tick_spacing),
 
                                                    interval_pair_prices_without_next_start
                                                        AS (SELECT pool_keys.token0,
