@@ -1,6 +1,7 @@
 import { Allocation } from "./airdrop.js";
 import { generateDrop } from "./generate-drop.js";
 import initializeClient from "./initializeClient.js";
+import { Decimal } from "decimal.js-light";
 
 const endDate = process.env.END_DATE
   ? new Date(`${process.env.END_DATE}T00:00:00Z`)
@@ -52,10 +53,10 @@ await client.query("COMMIT;");
 const amounts: Allocation[] = rewardsRaw
   .map(({ owner, total }) => ({
     owner: BigInt(owner),
-    total: BigInt(Math.floor(Number(total) * 1e18)),
+    total: BigInt(new Decimal(total).mul(1e18).toFixed(0, Decimal.ROUND_DOWN)),
   }))
-  // amounts less than 1 STRK are not included
-  .filter(({ total }) => total >= 10n ** 18n)
+  // amounts less than 0.0001 STRK are not included
+  .filter(({ total }) => total >= 10n ** 13n)
   .sort(({ total: a }, { total: b }) => Number(b - a))
   .map(({ total, owner }) => ({ claimee: owner, amount: total }));
 

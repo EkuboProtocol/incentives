@@ -3,14 +3,13 @@
   "version": "1.0.0",
   "scripts": {
     "compute-distributions": "tsx compute-distributions.ts",
-    "create-root": "tsx create-root.ts",
-    "create-below-threshold-root": "tsx create-below-threshold-root.ts",
-    "generate-airdrop": "tsx generate-airdrop.ts"
+    "create-root": "tsx create-root.ts"
   },
   "author": "Moody Salem",
   "type": "module",
   "dependencies": {
     "@types/pg": "^8.11.2",
+    "decimal.js-light": "^2.5.1",
     "pedersen-fast": "^0.4.0",
     "pg": "^8.11.3",
     "tsx": "^4.7.1",
