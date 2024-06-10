@@ -27,7 +27,7 @@ jobs:
 
       - run: npm install
 
-      - name: Create merkle root
+      - name: Generate voter drop
         env:
           PGHOST: ${{ secrets.POSTGRES_HOST }}
           PGPORT: ${{ secrets.POSTGRES_PORT }}
@@ -38,4 +38,4 @@ jobs:
           NODE_TLS_REJECT_UNAUTHORIZED: 0
           PROPOSAL_ID: ${{ inputs.proposal_id }}
           TOTAL_REWARD: ${{ inputs.total_reward }}
-        run: npm run create-root
+        run: npm run voter-root
