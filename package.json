@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "scripts": {
     "compute-distributions": "tsx compute-distributions.ts",
-    "create-root": "tsx create-root.ts"
+    "create-root": "tsx create-root.ts",
+    "voter-root": "tsx voter-root.ts"
   },
   "author": "Moody Salem",
   "type": "module",
