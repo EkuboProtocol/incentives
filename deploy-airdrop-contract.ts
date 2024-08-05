@@ -55,3 +55,5 @@ await client.query({
 });
 
 console.log("Inserted airdrop row");
+
+await client.end();
