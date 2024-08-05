@@ -1,0 +1,45 @@
+name: Deploy airdrop contract
+
+on:
+  workflow_dispatch:
+    inputs:
+      drop_id:
+        required: true
+        description: 'The ID of the generated drop for which to deploy the contract'
+      distributed_token:
+        required: true
+        default: '0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d'
+        description: 'The token that is distributed'
+
+concurrency: deploy-drop
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    name: Run
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm install
+
+      - name: Create merkle root
+        env:
+          PGHOST: ${{ secrets.POSTGRES_HOST }}
+          PGPORT: ${{ secrets.POSTGRES_PORT }}
+          PGDATABASE: ${{ secrets.POSTGRES_DB }}
+          PGUSER: ${{ secrets.POSTGRES_USERNAME }}
+          PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          PGSSLMODE: require
+          NODE_TLS_REJECT_UNAUTHORIZED: 0
+          DISTRIBUTED_TOKEN: ${{ inputs.distributed_token }}
+          DROP_ID: ${{ inputs.drop_id }}
+          ACCOUNT_ADDRESS: ${{ secrets.DEPLOYMENT_ACCOUNT_ADDRESS }}
+          PRIVATE_KEY: ${{ secrets.DEPLOYMENT_PRIVATE_KEY }}
+          NODE_URL: ${{ secrets.DEPLOYMENT_NODE_URL }}
+        run: npm run deploy-airdrop-contract
