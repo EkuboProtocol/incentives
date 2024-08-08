@@ -40,7 +40,8 @@ const deployResponse = await deployerAccount.deployContract({
 
 await provider.waitForTransaction(deployResponse.transaction_hash);
 
-console.log("Deployed airdrop", deployResponse.contract_address);
+console.log("Deployed airdrop");
+console.log(deployResponse.contract_address);
 
 await client.query({
   text: `
