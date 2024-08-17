@@ -15,6 +15,8 @@ export default async function initializeClient() {
           PRIMARY KEY (locker, salt, day)
       );
 
+      CREATE INDEX IF NOT EXISTS idx_strk_defi_spring_incentives_salt_day ON strk_defi_spring_incentives USING btree (salt, day);
+
       CREATE TABLE IF NOT EXISTS generated_drop
       (
           id           SERIAL PRIMARY KEY,
