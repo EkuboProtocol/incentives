@@ -208,7 +208,8 @@ for (const date of dates) {
                                                                             pairs.token1 = pool_keys.token1 AND
                                                                              -- no extension or twamm extension
                                                                             extension IN (0,
-                                                                                          0x043e4f09c32d13d43a880e85f69f7de93ceda62d6cf2581a582c6db635548fdc::NUMERIC)
+                                                                                          0x043e4f09c32d13d43a880e85f69f7de93ceda62d6cf2581a582c6db635548fdc::NUMERIC,
+                                                                                          0x005e470ff654d834983a46b8f29dfa99963d5044b993cb7b9c92243a69dab38f::NUMERIC)
                                                                              AND tick_spacing >= min_tick_spacing),
 
                                                    interval_pair_prices_without_next_start
