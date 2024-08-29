@@ -68,7 +68,7 @@ for (const date of dates) {
             token0.l2_token_address
           }/${
             token1.l2_token_address
-          }?numDays=7&fromDate=${datePlusOne.toISOString()}`
+          }?numDays=30&fromDate=${datePlusOne.toISOString()}`
         );
 
         const volatilityData = await volatilityResponse.json();
