@@ -201,7 +201,12 @@ for (const date of dates) {
 
                                                    -- all the pool keys related to the incentivized pools
                                                    relevant_pool_key_hashes
-                                                       AS (SELECT key_hash, pool_keys.token0, pool_keys.token1, fee
+                                                       AS (SELECT key_hash,
+                                                                  pool_keys.token0,
+                                                                  pool_keys.token1,
+                                                                  fee,
+                                                                  int4(LOG(1::NUMERIC + (fee / 340282366920938463463374607431768211456)) /
+                                                                       LOG(1.000001::NUMERIC)) as fee_in_ticks
                                                            FROM pool_keys
                                                                     JOIN pairs
                                                                          ON pairs.token0 = pool_keys.token0 AND
@@ -330,12 +335,15 @@ for (const date of dates) {
                                                                                      FROM all_position_updates_in_period),
 
                                                    position_states_during_period_with_intersections
-                                                       AS (SELECT psdp.pool_key_hash                 AS pool_key_hash,
+                                                       AS (SELECT psdp.pool_key_hash                                 AS pool_key_hash,
                                                                   locker,
                                                                   salt,
                                                                   psdp.liquidity,
 
-                                                                  stddev_range * position_tick_range AS tick_range_intersection,
+                                                                  stddev_range * position_tick_range *
+                                                                  INT4RANGE(-88722883, ipp.tick - rpkh.fee_in_ticks) AS tick_range_intersection_lower,
+                                                                  stddev_range * position_tick_range *
+                                                                  INT4RANGE(ipp.tick + rpkh.fee_in_ticks, 88722883)  AS tick_range_intersection_upper,
                                                                   weight,
                                                                   ipp.tick,
                                                                   ipp.price,
@@ -353,65 +361,58 @@ for (const date of dates) {
                                                                                       GREATEST(psdp.update_time, ipp.period_start)
                                                                                       )
                                                                                    ), 0)
-                                                                  )                                  AS row_seconds
+                                                                  )                                                  AS row_seconds
 
                                                            FROM position_states_during_period psdp
-                                                                    JOIN pool_keys pk ON psdp.pool_key_hash = pk.key_hash
-                                                                    LEFT JOIN interval_pair_prices ipp
-                                                                              ON pk.token0 = ipp.token0 AND pk.token1 = ipp.token1
                                                                     JOIN relevant_pool_key_hashes rpkh ON psdp.pool_key_hash = rpkh.key_hash
+                                                                    LEFT JOIN interval_pair_prices ipp
+                                                                              ON rpkh.token0 = ipp.token0 AND rpkh.token1 = ipp.token1
                                                                     JOIN pairs ON rpkh.token0 = pairs.token0 AND rpkh.token1 = pairs.token1),
 
                                                    position_depth_per_time
-                                                       AS (SELECT pool_key_hash                                                                     AS pool_key_hash,
+                                                       AS (SELECT pool_key_hash AS pool_key_hash,
                                                                   locker,
                                                                   salt,
 
                                                                   (CASE
-                                                                       WHEN tick < LOWER(tick_range_intersection)
-                                                                           THEN FLOOR(
-                                                                               liquidity *
-                                                                               ((1::NUMERIC /
-                                                                                 POWER(1.0000005::NUMERIC, LOWER(tick_range_intersection))) -
-                                                                                (1::NUMERIC /
-                                                                                 POWER(1.0000005::NUMERIC, UPPER(tick_range_intersection)))))
-                                                                       WHEN tick < UPPER(tick_range_intersection)
-                                                                           THEN FLOOR(
-                                                                               liquidity *
-                                                                               ((1::NUMERIC / POWER(1.0000005::NUMERIC, tick)) -
-                                                                                (1::NUMERIC /
-                                                                                 POWER(1.0000005::NUMERIC, UPPER(tick_range_intersection)))))
-                                                                       ELSE 0 END) *
-                                                                  price                                                                             AS amount0_in_terms_of_amount1,
+                                                                       WHEN ISEMPTY(tick_range_intersection_lower)
+                                                                           THEN 0
+                                                                       ELSE FLOOR(liquidity *
+                                                                                  (POWER(1.0000005::NUMERIC, UPPER(tick_range_intersection_lower)) -
+                                                                                   POWER(1.0000005::NUMERIC, LOWER(tick_range_intersection_lower))))
+                                                                      END)      AS amount1_lower,
 
                                                                   (CASE
-                                                                       WHEN tick < LOWER(tick_range_intersection)
+                                                                       WHEN ISEMPTY(tick_range_intersection_upper)
                                                                            THEN 0
-                                                                       WHEN tick < UPPER(tick_range_intersection)
-                                                                           THEN FLOOR(
+                                                                       ELSE FLOOR(
                                                                                liquidity *
-                                                                               (POWER(1.0000005::NUMERIC, tick) -
-                                                                                POWER(1.0000005::NUMERIC, LOWER(tick_range_intersection))))
-                                                                       ELSE FLOOR(liquidity *
-                                                                                  (POWER(1.0000005::NUMERIC, UPPER(tick_range_intersection)) -
-                                                                                   POWER(1.0000005::NUMERIC, LOWER(tick_range_intersection)))) END) AS amount1,
+                                                                               ((1::NUMERIC /
+                                                                                 POWER(1.0000005::NUMERIC, LOWER(tick_range_intersection_upper))) -
+                                                                                (1::NUMERIC /
+                                                                                 POWER(1.0000005::NUMERIC, UPPER(tick_range_intersection_upper)))))
+                                                                      END)      AS amount0_upper,
 
                                                                   row_seconds,
                                                                   weight
 
                                                            FROM position_states_during_period_with_intersections
-                                                           WHERE NOT ISEMPTY(tick_range_intersection)
-                                                             AND row_seconds > 0),
+                                                           WHERE row_seconds > 0),
 
 
                                                    position_depth_seconds AS (SELECT pool_key_hash,
                                                                                      locker,
                                                                                      salt,
                                                                                      SUM(
-                                                                                             (amount0_in_terms_of_amount1 + amount1) *
+                                                                                             amount0_upper *
                                                                                              row_seconds *
                                                                                              weight
-                                                                                     ) AS market_depth_score
+                                                                                     ) AS market_depth_score_lower,
+                                                                                     SUM(
+                                                                                             amount1_lower *
+                                                                                             row_seconds *
+                                                                                             weight
+                                                                                     ) AS market_depth_score_upper
                                                                               FROM position_depth_per_time
                                                                               GROUP BY pool_key_hash, locker, salt),
 
@@ -420,9 +421,8 @@ for (const date of dates) {
                                                                                           token1,
                                                                                           locker,
                                                                                           salt,
-                                                                                          SUM(market_depth_score *
-                                                                                              ((340282366920938463463374607431768211456 - fee) /
-                                                                                               340282366920938463463374607431768211456)) AS fee_adjusted_total_score
+                                                                                          SUM(market_depth_score_lower) AS total_score_lower,
+                                                                                          SUM(market_depth_score_upper) AS total_score_upper
                                                                                    FROM position_depth_seconds
                                                                                             JOIN pool_keys ON key_hash = pool_key_hash
                                                                                    GROUP BY token0, token1, locker, salt),
@@ -430,7 +430,8 @@ for (const date of dates) {
                                                    -- sum up the total liquidity seconds by pair
                                                    total_depth_seconds_per_pair AS (SELECT token0,
                                                                                            token1,
-                                                                                           SUM(fee_adjusted_total_score) total
+                                                                                           SUM(total_score_lower) total_lower,
+                                                                                           SUM(total_score_upper) total_upper
                                                                                     FROM position_pair_depth_seconds
                                                                                     GROUP BY token0, token1),
 
@@ -439,12 +440,14 @@ for (const date of dates) {
                                                                                                salt,
                                                                                                ppds.token0,
                                                                                                ppds.token1,
-                                                                                               (ppds.fee_adjusted_total_score / tdspp.total) AS position_rewards_share
+                                                                                               ((ppds.total_score_lower / tdspp.total_lower) +
+                                                                                                (ppds.total_score_upper / tdspp.total_upper)) /
+                                                                                               2 AS position_rewards_share
                                                                                         FROM position_pair_depth_seconds ppds
                                                                                                  JOIN total_depth_seconds_per_pair tdspp
                                                                                                       ON ppds.token0 = tdspp.token0 AND ppds.token1 = tdspp.token1
-                                                                                        WHERE ppds.fee_adjusted_total_score > 0
-                                                                                          AND tdspp.total > 0)
+                                                                                        WHERE ppds.total_score_lower > 0
+                                                                                           OR ppds.total_score_upper > 0)
 
                                                SELECT locker,
                                                       salt,
