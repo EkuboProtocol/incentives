@@ -5,9 +5,10 @@ import {
   constructMerkleTree,
   generateProof,
 } from "./airdrop.js";
-import client from "./client.js";
+import { Client } from "pg";
 
 export async function generateDrop(
+  client: Client,
   allocations: Allocation[],
   startDate: Date,
   endDate: Date
@@ -31,25 +32,25 @@ export async function generateDrop(
     rows: [{ id: dropId }],
   } = await client.query({
     text: `
-            INSERT INTO generated_drop (root, start_date, end_date)
-            VALUES ($1, $2, $3)
-            RETURNING id;
-        `,
+      INSERT INTO generated_drop (root, start_date, end_date)
+      VALUES ($1, $2, $3)
+      RETURNING id;
+    `,
     values: [root, startDate, endDate],
   });
 
   const insertText = `
-        INSERT INTO generated_drop_proof (drop_id, id, claimee, amount, proof)
-        VALUES
-        ${claimsWithProofs
-          .map(
-            ({ claim: { id, claimee, amount }, proof }) =>
-              `(${dropId}, ${id}, ${claimee}, ${amount}, '{${proof
-                .map((p) => p.toString())
-                .join(",")}}')`
-          )
-          .join(",\n")};
-    `;
+    INSERT INTO generated_drop_proof (drop_id, id, claimee, amount, proof)
+    VALUES
+    ${claimsWithProofs
+      .map(
+        ({ claim: { id, claimee, amount }, proof }) =>
+          `(${dropId}, ${id}, ${claimee}, ${amount}, '{${proof
+            .map((p) => p.toString())
+            .join(",")}}')`
+      )
+      .join(",\n")};
+  `;
 
   await client.query(insertText);
 

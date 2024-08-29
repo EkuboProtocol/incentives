@@ -1,6 +1,6 @@
 import { Allocation } from "./airdrop.js";
-import client from "./client.js";
 import { generateDrop } from "./generate-drop.js";
+import initializeClient from "./initializeClient.js";
 
 const endDate = process.env.END_DATE
   ? new Date(`${process.env.END_DATE}T00:00:00Z`)
@@ -13,35 +13,7 @@ const startDate = process.env.START_DATE
 if (endDate.getTime() <= startDate.getTime())
   throw new Error("END_DATE must be greater than START_DATE");
 
-await client.connect();
-await client.query(`
-    CREATE TABLE IF NOT EXISTS generated_drop
-    (
-        id           SERIAL PRIMARY KEY,
-        root         NUMERIC     NOT NULL,
-        start_date   timestamptz NOT NULL,
-        end_date     timestamptz NOT NULL,
-        generated_at timestamptz DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS generated_drop_proof
-    (
-        drop_id INT REFERENCES generated_drop (id) ON DELETE CASCADE,
-        id      INT       NOT NULL,
-        claimee NUMERIC   NOT NULL,
-        amount  NUMERIC   NOT NULL,
-        proof   NUMERIC[] NOT NULL,
-        PRIMARY KEY (drop_id, id, claimee)
-    );
-
-    -- meant to be manually populated
-    CREATE TABLE IF NOT EXISTS deployed_airdrop_contracts
-    (
-        address NUMERIC NOT NULL PRIMARY KEY,
-        token   NUMERIC NOT NULL,
-        drop_id INT REFERENCES generated_drop (id) ON DELETE CASCADE
-    );
-`);
+const client = await initializeClient();
 
 await client.query("BEGIN;");
 const { rows: rewardsRaw } = await client.query<{
@@ -50,30 +22,37 @@ const { rows: rewardsRaw } = await client.query<{
 }>({
   values: [startDate, endDate],
   text: `
-        WITH ranked_transfers AS (SELECT token_id,
-                                         to_address,
-                                         ROW_NUMBER() OVER (
-                                             PARTITION BY token_id
-                                             ORDER BY event_id DESC
-                                             ) AS row_no
-                                  FROM position_transfers pt
-                                           JOIN event_keys ek ON pt.event_id = ek.id
-                                           JOIN blocks b ON ek.block_number = b.number
-                                  WHERE to_address != 0
-                                    AND b.time < $2),
+      WITH rewards_by_token AS (SELECT salt::BIGINT    AS token_id,
+                                       SUM(incentives) AS total
+                                FROM strk_defi_spring_incentives
+                                WHERE day >= $1
+                                  AND day < $2
+                                GROUP BY salt),
 
-             token_owners AS (SELECT token_id,
-                                     to_address AS owner
-                              FROM ranked_transfers
-                              WHERE row_no = 1)
+           ranked_transfers AS (SELECT token_id,
+                                       to_address,
+                                       ROW_NUMBER() OVER (
+                                           PARTITION BY token_id
+                                           ORDER BY event_id DESC
+                                           ) AS row_no
+                                FROM position_transfers pt
+                                         JOIN event_keys ek ON pt.event_id = ek.id
+                                         JOIN blocks b ON ek.block_number = b.number
+                                WHERE to_address != 0
+                                  AND b.time < $2),
 
-        SELECT owner,
-               SUM(incentives) AS total
-        FROM strk_defi_spring_incentives
-                 JOIN token_owners ON token_id = salt
-            AND day >= $1 AND day < $2
-        GROUP BY owner
-    `,
+           token_owners AS (SELECT token_id,
+                                   to_address AS owner
+                            FROM ranked_transfers
+                            WHERE row_no = 1)
+
+      SELECT owner,
+             SUM(rbt.total) AS total
+      FROM rewards_by_token rbt
+               JOIN token_owners t_o ON t_o.token_id = rbt.token_id
+      GROUP BY t_o.owner
+      ORDER BY 2 DESC
+  `,
 });
 await client.query("COMMIT;");
 
@@ -82,12 +61,12 @@ const amounts: Allocation[] = rewardsRaw
     owner: BigInt(owner),
     total: BigInt(Math.floor(Number(total) * 1e18)),
   }))
-  // amounts less than 1 STRK are not included
-  .filter(({ total }) => total >= 10n ** 18n)
+  // amounts less than 0.0001 STRK are not included
+  .filter(({ total }) => total >= 10n ** 13n)
   .sort(({ total: a }, { total: b }) => Number(b - a))
   .map(({ total, owner }) => ({ claimee: owner, amount: total }));
 
-const dropId = await generateDrop(amounts, startDate, endDate);
+const dropId = await generateDrop(client, amounts, startDate, endDate);
 
 console.log("Created drop ID", dropId);
 

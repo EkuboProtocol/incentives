@@ -4,7 +4,8 @@
   "scripts": {
     "compute-distributions": "tsx compute-distributions.ts",
     "create-root": "tsx create-root.ts",
-    "generate-airdrop": "tsx generate-airdrop.ts"
+    "voter-root": "tsx voter-root.ts",
+    "deploy-airdrop-contract": "tsx deploy-airdrop-contract.ts"
   },
   "author": "Moody Salem",
   "type": "module",
@@ -12,6 +13,7 @@
     "@types/pg": "^8.11.2",
     "pedersen-fast": "^0.4.0",
     "pg": "^8.11.3",
+    "starknet": "^6.12.1",
     "tsx": "^4.7.1",
     "typescript": "^5.3.3"
   }

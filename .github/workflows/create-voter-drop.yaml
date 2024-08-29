@@ -1,18 +1,16 @@
-name: Generate airdrop
+name: Create voter drop
 
 on:
   workflow_dispatch:
     inputs:
-      power:
+      proposal_id:
         required: true
-        default: '1.000001'
-        description: 'The power that makes this drop super-linear'
-      num_tokens:
+        description: 'The` ID of the proposal for which to create the drop'
+      total_reward:
         required: true
-        default: '2000000'
-        description: 'The total number of tokens distributed'
+        description: 'The total reward in wei of token'
 
-concurrency: drop
+concurrency: query
 
 jobs:
   run:
@@ -29,7 +27,7 @@ jobs:
 
       - run: npm install
 
-      - name: Create drop
+      - name: Generate voter drop
         env:
           PGHOST: ${{ secrets.POSTGRES_HOST }}
           PGPORT: ${{ secrets.POSTGRES_PORT }}
@@ -38,6 +36,6 @@ jobs:
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           PGSSLMODE: require
           NODE_TLS_REJECT_UNAUTHORIZED: 0
-          POWER: ${{ inputs.power }}
-          NUM_TOKENS: ${{ inputs.num_tokens }}
-        run: npm run generate-airdrop
+          PROPOSAL_ID: ${{ inputs.proposal_id }}
+          TOTAL_REWARD: ${{ inputs.total_reward }}
+        run: npm run voter-root
