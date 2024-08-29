@@ -20,6 +20,12 @@ const dates = process.env.RUN_DATES?.length
   ? process.env.RUN_DATES.split(",")
   : [new Date(Date.now() - 86_400_000).toISOString().split("T")[0]];
 
+const numDaysRealizedVolatility = /^\d{1,3}$/.test(
+  process.env.NUM_DAYS_REALIZED_VOLATILITY ?? ""
+)
+  ? Number(process.env.NUM_DAYS_REALIZED_VOLATILITY)
+  : 30;
+
 const overwrite = process.env.OVERWRITE === "true";
 
 const client = await initializeClient();
@@ -68,7 +74,7 @@ for (const date of dates) {
             token0.l2_token_address
           }/${
             token1.l2_token_address
-          }?numDays=30&fromDate=${datePlusOne.toISOString()}`
+          }?numDays=${numDaysRealizedVolatility}&fromDate=${datePlusOne.toISOString()}`
         );
 
         const volatilityData = await volatilityResponse.json();
