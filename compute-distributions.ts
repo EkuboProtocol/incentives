@@ -269,7 +269,10 @@ for (const date of dates) {
                                                                                weight,
                                                                                INT4RANGE(
                                                                                    CEIL(ipp.tick - multiple * volatility_in_ticks)::INT,
-                                                                                   FLOOR(ipp.tick + multiple * volatility_in_ticks)::INT)                    stddev_range
+                                                                                   ipp.tick::INT)                                                            stddev_range_lower,
+                                                                               INT4RANGE(
+                                                                                   ipp.tick::INT,
+                                                                                   FLOOR(ipp.tick + multiple * volatility_in_ticks)::INT)                    stddev_range_upper
                                                                         FROM interval_pair_prices_without_next_start ipp
                                                                                JOIN pairs ON ipp.token0 = pairs.token0 AND ipp.token1 = pairs.token1
                                                                                JOIN stddev_multiple_weights ON TRUE),
@@ -331,8 +334,8 @@ for (const date of dates) {
                                                position_states_during_period AS (SELECT pool_key_hash,
                                                                                         locker,
                                                                                         salt,
-                                                                                        INT4RANGE(lower_bound,
-                                                                                                  upper_bound)                                                                             AS position_tick_range,
+                                                                                        lower_bound,
+                                                                                        upper_bound,
 
                                                                                         SUM(liquidity_delta)
                                                                                         OVER (PARTITION BY pool_key_hash, locker, salt, lower_bound, upper_bound ORDER BY update_event_id) AS liquidity,
@@ -347,15 +350,19 @@ for (const date of dates) {
                                                                                  FROM all_position_updates_in_period),
 
                                                position_states_during_period_with_intersections
-                                                 AS (SELECT psdp.pool_key_hash                                 AS pool_key_hash,
+                                                 AS (SELECT psdp.pool_key_hash           AS pool_key_hash,
                                                             locker,
                                                             salt,
                                                             psdp.liquidity,
 
-                                                            stddev_range * position_tick_range *
-                                                            INT4RANGE(-88722883, ipp.tick - rpkh.fee_in_ticks) AS tick_range_intersection_lower,
-                                                            stddev_range * position_tick_range *
-                                                            INT4RANGE(ipp.tick + rpkh.fee_in_ticks, 88722883)  AS tick_range_intersection_upper,
+                                                            stddev_range_lower *
+                                                            INT4RANGE(lower_bound - rpkh.fee_in_ticks,
+                                                                      upper_bound -
+                                                                      rpkh.fee_in_ticks) AS tick_range_intersection_lower,
+                                                            stddev_range_upper *
+                                                            INT4RANGE(lower_bound + rpkh.fee_in_ticks,
+                                                                      upper_bound +
+                                                                      rpkh.fee_in_ticks) AS tick_range_intersection_upper,
                                                             weight,
                                                             ipp.tick,
                                                             ipp.price,
@@ -373,7 +380,7 @@ for (const date of dates) {
                                                                       GREATEST(psdp.update_time, ipp.period_start)
                                                                       )
                                                                          ), 0)
-                                                            )                                                  AS row_seconds
+                                                            )                            AS row_seconds
 
                                                      FROM position_states_during_period psdp
                                                             JOIN relevant_pool_key_hashes rpkh ON psdp.pool_key_hash = rpkh.key_hash
