@@ -350,19 +350,26 @@ for (const date of dates) {
                                                                                  FROM all_position_updates_in_period),
 
                                                position_states_during_period_with_intersections
-                                                 AS (SELECT psdp.pool_key_hash           AS pool_key_hash,
+                                                 AS (SELECT psdp.pool_key_hash                         AS pool_key_hash,
                                                             locker,
                                                             salt,
                                                             psdp.liquidity,
 
-                                                            stddev_range_lower *
-                                                            INT4RANGE(lower_bound - rpkh.fee_in_ticks,
-                                                                      upper_bound -
-                                                                      rpkh.fee_in_ticks) AS tick_range_intersection_lower,
-                                                            stddev_range_upper *
-                                                            INT4RANGE(lower_bound + rpkh.fee_in_ticks,
-                                                                      upper_bound +
-                                                                      rpkh.fee_in_ticks) AS tick_range_intersection_upper,
+                                                            (CASE
+                                                               WHEN lower_bound < ipp.tick THEN
+                                                                 stddev_range_lower *
+                                                                 INT4RANGE(lower_bound - rpkh.fee_in_ticks,
+                                                                           LEAST(upper_bound, ipp.tick) -
+                                                                           rpkh.fee_in_ticks)
+                                                               ELSE INT4RANGE(ipp.tick, ipp.tick) END) AS tick_range_intersection_lower,
+                                                            (CASE
+                                                               WHEN upper_bound > ipp.tick THEN
+                                                                 stddev_range_upper *
+                                                                 INT4RANGE(GREATEST(ipp.tick, lower_bound) +
+                                                                           rpkh.fee_in_ticks,
+                                                                           upper_bound +
+                                                                           rpkh.fee_in_ticks)
+                                                               ELSE INT4RANGE(ipp.tick, ipp.tick) END) AS tick_range_intersection_upper,
                                                             weight,
                                                             ipp.tick,
                                                             ipp.price,
@@ -380,7 +387,7 @@ for (const date of dates) {
                                                                       GREATEST(psdp.update_time, ipp.period_start)
                                                                       )
                                                                          ), 0)
-                                                            )                            AS row_seconds
+                                                            )                                          AS row_seconds
 
                                                      FROM position_states_during_period psdp
                                                             JOIN relevant_pool_key_hashes rpkh ON psdp.pool_key_hash = rpkh.key_hash
