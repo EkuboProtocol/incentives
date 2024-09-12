@@ -20,12 +20,6 @@ const dates = process.env.RUN_DATES?.length
   ? process.env.RUN_DATES.split(",")
   : [new Date(Date.now() - 86_400_000).toISOString().split("T")[0]];
 
-const numDaysRealizedVolatility = /^\d{1,3}$/.test(
-  process.env.NUM_DAYS_REALIZED_VOLATILITY ?? ""
-)
-  ? Number(process.env.NUM_DAYS_REALIZED_VOLATILITY)
-  : 30;
-
 const overwrite = process.env.OVERWRITE === "true";
 
 const client = await initializeClient();
@@ -65,31 +59,10 @@ for (const date of dates) {
             `Missing day data for ${token0.symbol}/${token1.symbol}`
           );
 
-        const datePlusOne = new Date(
-          new Date(isoFormattedDate).getTime() + 86_400_000
+        const volatility_in_ticks = Math.round(
+          Math.log(Math.exp(dayData.thirty_day_realized_volatility)) /
+            Math.log(1.000001)
         );
-
-        const volatilityResponse = await fetch(
-          `https://mainnet-api.ekubo.org/volatility/${
-            token0.l2_token_address
-          }/${
-            token1.l2_token_address
-          }?numDays=${numDaysRealizedVolatility}&fromDate=${datePlusOne.toISOString()}`
-        );
-
-        const volatilityData = await volatilityResponse.json();
-
-        let volatility_in_ticks = volatilityData?.volatility?.ticks;
-
-        if (!volatility_in_ticks) {
-          console.log(
-            `Missing volatility data for ${token0.symbol}/${token1.symbol}, falling back to OBL day level data`
-          );
-          volatility_in_ticks = Math.round(
-            Math.log(Math.exp(dayData.thirty_day_realized_volatility)) /
-              Math.log(1.000001)
-          );
-        }
 
         return {
           token0: {

@@ -7,13 +7,6 @@ on:
     inputs:
       run_dates:
         description: 'A comma separated list of ISO dates, e.g. 2024-02-23,2024-02-24 for which to run the computation'
-      num_days_rv:
-        description: 'Number of days of realized volatility to use'
-        required: true
-        options:
-          - '7'
-          - '30'
-        default: '30'
       overwrite:
         description: 'Whether to overwrite data for the given date if it exists'
         required: true
@@ -50,5 +43,4 @@ jobs:
           NODE_TLS_REJECT_UNAUTHORIZED: 0
           RUN_DATES: ${{ inputs.run_dates }}
           OVERWRITE: ${{ inputs.overwrite }}
-          NUM_DAYS_REALIZED_VOLATILITY: ${{ inputs.num_days_rv }}
         run: npm run compute-distributions
