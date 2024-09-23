@@ -234,6 +234,8 @@ for (const date of dates) {
                                                                                     LIMIT 1)
                                                                              ORDER BY id
                                                                              LIMIT 1) AND (SELECT id FROM max_event_id)
+                                                       AND swaps.delta0 != 0
+                                                       AND swaps.delta1 != 0
                                                      GROUP BY pool_keys.token0, pool_keys.token1, period_start),
 
                                                interval_pair_prices AS (SELECT ipp.*,
