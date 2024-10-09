@@ -181,7 +181,7 @@ for (const date of dates) {
                                                fee_calc AS (SELECT DISTINCT(fee),
                                                                            int4(
                                                                                LOG(1::NUMERIC + (fee / 340282366920938463463374607431768211456)) /
-                                                                               LOG(1.000001::NUMERIC)) AS fee_in_ticks
+                                                                               LOG(1.000001::NUMERIC)) * 4 AS fee_ticks_penalty
                                                             FROM pool_keys),
 
                                                -- all the pool keys related to the incentivized pools
@@ -190,7 +190,7 @@ for (const date of dates) {
                                                             pk.token0,
                                                             pk.token1,
                                                             pk.fee,
-                                                            fc.fee_in_ticks
+                                                            fc.fee_ticks_penalty
                                                      FROM pool_keys pk
                                                             JOIN pairs p
                                                                  ON p.token0 = pk.token0 AND
@@ -201,7 +201,7 @@ for (const date of dates) {
                                                                                   0x005e470ff654d834983a46b8f29dfa99963d5044b993cb7b9c92243a69dab38f::NUMERIC)
                                                                    AND tick_spacing >= min_tick_spacing
                                                             JOIN fee_calc fc
-                                                                 ON pk.fee = fc.fee AND fc.fee_in_ticks < p.volatility_in_ticks),
+                                                                 ON pk.fee = fc.fee),
 
                                                interval_pair_prices_without_next_start
                                                  AS (SELECT pool_keys.token0,
@@ -333,17 +333,17 @@ for (const date of dates) {
                                                             (CASE
                                                                WHEN lower_bound < ipp.tick THEN
                                                                  stddev_range_lower *
-                                                                 INT4RANGE(lower_bound - rpkh.fee_in_ticks,
+                                                                 INT4RANGE(lower_bound - rpkh.fee_ticks_penalty,
                                                                            LEAST(upper_bound, ipp.tick) -
-                                                                           rpkh.fee_in_ticks)
+                                                                           rpkh.fee_ticks_penalty)
                                                                ELSE INT4RANGE(ipp.tick, ipp.tick) END) AS tick_range_intersection_lower,
                                                             (CASE
                                                                WHEN upper_bound > ipp.tick THEN
                                                                  stddev_range_upper *
                                                                  INT4RANGE(GREATEST(ipp.tick, lower_bound) +
-                                                                           rpkh.fee_in_ticks,
+                                                                           rpkh.fee_ticks_penalty,
                                                                            upper_bound +
-                                                                           rpkh.fee_in_ticks)
+                                                                           rpkh.fee_ticks_penalty)
                                                                ELSE INT4RANGE(ipp.tick, ipp.tick) END) AS tick_range_intersection_upper,
                                                             weight,
                                                             ipp.tick,
