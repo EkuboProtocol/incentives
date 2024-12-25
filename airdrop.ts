@@ -17,12 +17,12 @@ export function computeClaimHash(claim: Claim): bigint {
       pedersen_from_hex(
         pedersen_from_hex(
           `0x${HASH_SELECTOR.toString(16)}`,
-          `0x${claim.id.toString(16)}`
+          `0x${claim.id.toString(16)}`,
         ),
-        `0x${claim.claimee.toString(16)}`
+        `0x${claim.claimee.toString(16)}`,
       ),
-      `0x${claim.amount.toString(16)}`
-    )
+      `0x${claim.amount.toString(16)}`,
+    ),
   );
 }
 
@@ -30,11 +30,11 @@ export function computeClaimHash(claim: Claim): bigint {
 function hashFunction(left: bigint, right: bigint): bigint {
   if (left < right) {
     return BigInt(
-      pedersen_from_hex(`0x${left.toString(16)}`, `0x${right.toString(16)}`)
+      pedersen_from_hex(`0x${left.toString(16)}`, `0x${right.toString(16)}`),
     );
   } else {
     return BigInt(
-      pedersen_from_hex(`0x${right.toString(16)}`, `0x${left.toString(16)}`)
+      pedersen_from_hex(`0x${right.toString(16)}`, `0x${left.toString(16)}`),
     );
   }
 }

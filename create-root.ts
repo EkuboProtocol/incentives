@@ -22,37 +22,37 @@ const { rows: rewardsRaw } = await client.query<{
 }>({
   values: [startDate, endDate],
   text: `
-      WITH rewards_by_token AS (SELECT salt::BIGINT    AS token_id,
-                                       SUM(incentives) AS total
-                                FROM strk_defi_spring_incentives
-                                WHERE day >= $1
-                                  AND day < $2
-                                GROUP BY salt),
+        WITH rewards_by_token AS (SELECT salt::BIGINT    AS token_id,
+                                         SUM(incentives) AS total
+                                  FROM strk_defi_spring_incentives
+                                  WHERE day >= $1
+                                    AND day < $2
+                                  GROUP BY salt),
 
-           ranked_transfers AS (SELECT token_id,
-                                       to_address,
-                                       ROW_NUMBER() OVER (
-                                           PARTITION BY token_id
-                                           ORDER BY event_id DESC
-                                           ) AS row_no
-                                FROM position_transfers pt
-                                         JOIN event_keys ek ON pt.event_id = ek.id
-                                         JOIN blocks b ON ek.block_number = b.number
-                                WHERE to_address != 0
-                                  AND b.time < $2),
+             ranked_transfers AS (SELECT token_id,
+                                         to_address,
+                                         ROW_NUMBER() OVER (
+                                             PARTITION BY token_id
+                                             ORDER BY event_id DESC
+                                             ) AS row_no
+                                  FROM position_transfers pt
+                                           JOIN event_keys ek ON pt.event_id = ek.id
+                                           JOIN blocks b ON ek.block_number = b.number
+                                  WHERE to_address != 0
+                                    AND b.time < $2),
 
-           token_owners AS (SELECT token_id,
-                                   to_address AS owner
-                            FROM ranked_transfers
-                            WHERE row_no = 1)
+             token_owners AS (SELECT token_id,
+                                     to_address AS owner
+                              FROM ranked_transfers
+                              WHERE row_no = 1)
 
-      SELECT owner,
-             SUM(rbt.total) AS total
-      FROM rewards_by_token rbt
-               JOIN token_owners t_o ON t_o.token_id = rbt.token_id
-      GROUP BY t_o.owner
-      ORDER BY 2 DESC
-  `,
+        SELECT owner,
+               SUM(rbt.total) AS total
+        FROM rewards_by_token rbt
+                 JOIN token_owners t_o ON t_o.token_id = rbt.token_id
+        GROUP BY t_o.owner
+        ORDER BY 2 DESC
+    `,
 });
 await client.query("COMMIT;");
 
@@ -68,6 +68,10 @@ const amounts: Allocation[] = rewardsRaw
 
 const dropId = await generateDrop(client, amounts, startDate, endDate);
 
-console.log("Created drop ID", dropId);
+console.log("Created drop ID: ", dropId);
+
+const rawTotal = amounts.reduce((memo, { amount }) => memo + amount, 0n);
+console.log("Raw total: ", rawTotal);
+console.log("Formatted amount: ", Number(rawTotal) / 1e18);
 
 await client.end();

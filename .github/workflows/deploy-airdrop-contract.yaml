@@ -5,11 +5,11 @@ on:
     inputs:
       drop_id:
         required: true
-        description: 'The ID of the generated drop for which to deploy the contract'
+        description: "The ID of the generated drop for which to deploy the contract"
       distributed_token:
         required: true
-        default: '0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d'
-        description: 'The token that is distributed'
+        default: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d"
+        description: "The token that is distributed"
 
 concurrency: deploy-drop
 
@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: "npm"
 
       - run: npm install
 

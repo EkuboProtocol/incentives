@@ -11,7 +11,7 @@ export async function generateDrop(
   client: Client,
   allocations: Allocation[],
   startDate: Date,
-  endDate: Date
+  endDate: Date,
 ): Promise<number> {
   const claimsWithHashes: { claim: Claim; hash: bigint }[] = allocations
     .map((c, ix): Claim => ({ id: ix, ...c }))
@@ -19,7 +19,7 @@ export async function generateDrop(
 
   // Example usage:
   const { root, layers } = constructMerkleTree(
-    claimsWithHashes.map(({ hash }) => hash)
+    claimsWithHashes.map(({ hash }) => hash),
   );
 
   const claimsWithProofs = claimsWithHashes.map(({ hash, claim }) => ({
@@ -47,7 +47,7 @@ export async function generateDrop(
         ({ claim: { id, claimee, amount }, proof }) =>
           `(${dropId}, ${id}, ${claimee}, ${amount}, '{${proof
             .map((p) => p.toString())
-            .join(",")}}')`
+            .join(",")}}')`,
       )
       .join(",\n")};
   `;

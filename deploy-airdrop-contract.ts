@@ -5,12 +5,6 @@ const dropId = process.env.DROP_ID;
 
 if (!dropId) throw new Error("Missing drop ID");
 const client = await initializeClient();
-console.log('total amount', await client.query<{ total: string }>({
-  text: `SELECT SUM(amount) as total
-         FROM generated_drop_proof
-         WHERE drop_id = $1`,
-  values: [BigInt(dropId)],
-}));
 const { rows } = await client.query<{ root: string }>({
   text: `SELECT root
          FROM generated_drop
@@ -36,7 +30,7 @@ const airdropClassHash =
 const constructorCalldata = [distributedToken, root, "0x0", "0x0"];
 console.log(
   `Deploying airdrop with class hash ${airdropClassHash} and arguments`,
-  constructorCalldata
+  constructorCalldata,
 );
 
 const deployResponse = await deployerAccount.deployContract({

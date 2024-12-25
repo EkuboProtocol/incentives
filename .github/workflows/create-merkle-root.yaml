@@ -5,10 +5,10 @@ on:
     inputs:
       start_date:
         required: true
-        description: 'The ISO format start date of the date range for which to compute the merkle root'
+        description: "The ISO format start date of the date range for which to compute the merkle root"
       end_date:
         required: true
-        description: 'The ISO format end date of the date range for which to compute the merkle root, exclusive'
+        description: "The ISO format end date of the date range for which to compute the merkle root, exclusive"
 
 concurrency: query
 
@@ -23,7 +23,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: "npm"
 
       - run: npm install
 

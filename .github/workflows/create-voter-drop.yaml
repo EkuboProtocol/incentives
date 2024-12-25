@@ -5,10 +5,10 @@ on:
     inputs:
       proposal_id:
         required: true
-        description: 'The` ID of the proposal for which to create the drop'
+        description: "The` ID of the proposal for which to create the drop"
       total_reward:
         required: true
-        description: 'The total reward in wei of token'
+        description: "The total reward in wei of token"
 
 concurrency: query
 
@@ -23,7 +23,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: "npm"
 
       - run: npm install
 

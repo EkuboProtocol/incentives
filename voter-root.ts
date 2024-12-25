@@ -82,7 +82,7 @@ if (proposalTimeQuery.length !== 1) {
 
 const totalVotes = votes.reduce(
   (memo, { votes_contributed }) => memo + BigInt(votes_contributed),
-  0n
+  0n,
 );
 
 const amounts: Allocation[] = votes
@@ -93,7 +93,7 @@ const amounts: Allocation[] = votes
   .map(({ total, owner }) => ({ claimee: owner, amount: total }));
 
 const startDate = new Date(
-  proposalTimeQuery[0].time.getTime() + PROPOSAL_VOTING_DELAY * 1000
+  proposalTimeQuery[0].time.getTime() + PROPOSAL_VOTING_DELAY * 1000,
 );
 const endDate = new Date(startDate.getTime() + PROPOSAL_VOTING_PERIOD * 1000);
 const dropId = await generateDrop(client, amounts, startDate, endDate);

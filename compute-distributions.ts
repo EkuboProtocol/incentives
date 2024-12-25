@@ -1,7 +1,7 @@
 import initializeClient from "./initializeClient.js";
 
 const incentiveDataResponse = await fetch(
-  "https://mainnet-api.ekubo.org/defi-spring-incentives"
+  "https://mainnet-api.ekubo.org/defi-spring-incentives",
 );
 
 const incentiveData = (await incentiveDataResponse.json()) as {
@@ -32,11 +32,11 @@ for (const date of dates) {
       `SELECT 1 AS exists
              FROM strk_defi_spring_incentives
              WHERE day = '${isoFormattedDate}'
-             LIMIT 1`
+             LIMIT 1`,
     );
     if (rows.length) {
       console.log(
-        `Skipping ${date} because data exists. To process anyway, set OVERWRITE to true`
+        `Skipping ${date} because data exists. To process anyway, set OVERWRITE to true`,
       );
       continue;
     }
@@ -56,12 +56,12 @@ for (const date of dates) {
         const dayData = allocations?.find((a) => a.date === date);
         if (!dayData)
           throw new Error(
-            `Missing day data for ${token0.symbol}/${token1.symbol}`
+            `Missing day data for ${token0.symbol}/${token1.symbol}`,
           );
 
         const volatility_in_ticks = Math.round(
           Math.log(Math.exp(dayData.thirty_day_realized_volatility)) /
-            Math.log(1.000001)
+            Math.log(1.000001),
         );
 
         return {
@@ -76,7 +76,7 @@ for (const date of dates) {
           allocation: dayData.allocation,
           volatility_in_ticks,
         };
-      })
+      }),
   );
 
   if (!pairData.length) {
@@ -87,10 +87,10 @@ for (const date of dates) {
     .map(
       (p) =>
         `(${BigInt(p.token0.l2_token_address)}::NUMERIC, ${BigInt(
-          p.token1.l2_token_address
+          p.token1.l2_token_address,
         )}::NUMERIC, ${p.allocation}::NUMERIC, ${
           p.volatility_in_ticks
-        }::INT, ${Math.floor(p.volatility_in_ticks / 2500)}::INT)`
+        }::INT, ${Math.floor(p.volatility_in_ticks / 2500)}::INT)`,
     )
     .join("\n,");
 
@@ -124,7 +124,7 @@ for (const date of dates) {
     .map(({ multiple, weight }, ix, list) =>
       ix === 0
         ? `(${multiple}::float, ${weight}::float)`
-        : `(${multiple}, ${weight - list[ix - 1].weight})`
+        : `(${multiple}, ${weight - list[ix - 1].weight})`,
     )
     .join(", ");
 
@@ -134,7 +134,7 @@ for (const date of dates) {
   await client.query(
     `DELETE
          FROM strk_defi_spring_incentives
-         WHERE day = '${isoFormattedDate}'::timestamptz;`
+         WHERE day = '${isoFormattedDate}'::timestamptz;`,
   );
 
   const queryText = `
