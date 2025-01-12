@@ -441,8 +441,8 @@ for (const date of dates) {
                                                                                            salt,
                                                                                            ppds.token0,
                                                                                            ppds.token1,
-                                                                                           ((ppds.total_score_lower / tdspp.total_lower) +
-                                                                                            (ppds.total_score_upper / tdspp.total_upper)) /
+                                                                                           ((ppds.total_score_lower / GREATEST(tdspp.total_lower, 1)) +
+                                                                                            (ppds.total_score_upper / GREATEST(tdspp.total_upper, 1))) /
                                                                                            2 AS position_rewards_share
                                                                                     FROM position_pair_depth_seconds ppds
                                                                                            JOIN total_depth_seconds_per_pair tdspp
