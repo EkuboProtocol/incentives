@@ -1,10 +1,10 @@
 import { Account, RpcProvider } from "starknet";
-import initializeClient from "./initializeClient.js";
+import initializeIncentivesClient from "./initializeIncentivesClient.js";
 
 const dropId = process.env.DROP_ID;
 
 if (!dropId) throw new Error("Missing drop ID");
-const client = await initializeClient();
+const client = await initializeIncentivesClient();
 const { rows } = await client.query<{ root: string }>({
   text: `SELECT root
          FROM generated_drop

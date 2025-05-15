@@ -2,6 +2,7 @@
   "name": "defi-spring",
   "version": "1.0.0",
   "scripts": {
+    "sync-defi-spring": "tsx sync-defi-spring.ts",
     "compute-distributions": "tsx compute-distributions.ts",
     "create-root": "tsx create-root.ts",
     "voter-root": "tsx voter-root.ts",

@@ -1,4 +1,4 @@
-import initializeClient from "./initializeClient.js";
+import initializeIncentivesClient from "./initializeIncentivesClient.js";
 
 const incentiveDataResponse = await fetch(
   "https://mainnet-api.ekubo.org/defi-spring-incentives",
@@ -22,7 +22,7 @@ const dates = process.env.RUN_DATES?.length
 
 const overwrite = process.env.OVERWRITE === "true";
 
-const client = await initializeClient();
+const client = await initializeIncentivesClient();
 
 for (const date of dates) {
   const isoFormattedDate = `${date}T00:00:00Z`;

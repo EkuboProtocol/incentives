@@ -1,13 +1,13 @@
 import { Allocation } from "./airdrop.js";
 import { generateDrop } from "./generate-drop.js";
-import initializeClient from "./initializeClient.js";
+import initializeIncentivesClient from "./initializeIncentivesClient.js";
 
 const proposalId = BigInt(process.env.PROPOSAL_ID);
 const totalReward = BigInt(process.env.TOTAL_REWARD);
 const PROPOSAL_VOTING_DELAY = 86400;
 const PROPOSAL_VOTING_PERIOD = 86400 * 7;
 
-const client = await initializeClient();
+const client = await initializeIncentivesClient();
 
 await client.query("BEGIN;");
 

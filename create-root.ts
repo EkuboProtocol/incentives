@@ -1,6 +1,7 @@
 import { Allocation } from "./airdrop.js";
 import { generateDrop } from "./generate-drop.js";
-import initializeClient from "./initializeClient.js";
+import initializeIncentivesClient from "./initializeIncentivesClient.js";
+import { STARKNET_AIRDROP_CONTRACT_OPTIONS } from "./starknetAirdropContract.js";
 
 const endDate = process.env.END_DATE
   ? new Date(`${process.env.END_DATE}T00:00:00Z`)
@@ -13,7 +14,7 @@ const startDate = process.env.START_DATE
 if (endDate.getTime() <= startDate.getTime())
   throw new Error("END_DATE must be greater than START_DATE");
 
-const client = await initializeClient();
+const client = await initializeIncentivesClient();
 
 await client.query("BEGIN;");
 const { rows: rewardsRaw } = await client.query<{
@@ -66,7 +67,13 @@ const amounts: Allocation[] = rewardsRaw
   .sort(({ total: a }, { total: b }) => Number(b - a))
   .map(({ total, owner }) => ({ claimee: owner, amount: total }));
 
-const dropId = await generateDrop(client, amounts, startDate, endDate);
+const dropId = await generateDrop(
+  client,
+  amounts,
+  startDate,
+  endDate,
+  STARKNET_AIRDROP_CONTRACT_OPTIONS,
+);
 
 console.log("Created drop ID: ", dropId);
 
