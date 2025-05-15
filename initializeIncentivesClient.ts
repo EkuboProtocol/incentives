@@ -54,6 +54,9 @@ export default async function initializeIncentivesClient() {
           PRIMARY KEY (id)
       );
 
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_reward_periods_pair_period
+          ON incentives.campaign_reward_periods (token0, token1, start_time, end_time);
+
       CREATE TABLE IF NOT EXISTS incentives.computed_rewards
       (
           campaign_reward_period_id int8    NOT NULL REFERENCES incentives.campaign_reward_periods (id),
@@ -77,6 +80,10 @@ export default async function initializeIncentivesClient() {
           campaign_reward_period_id int8 NOT NULL REFERENCES incentives.campaign_reward_periods (id) ON DELETE CASCADE
       );
 
+      -- this prevents us from including the same period id in multiple drops
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_generated_drop_reward_periods_period_id
+          ON incentives.generated_drop_reward_periods (campaign_reward_period_id);
+
       CREATE TABLE IF NOT EXISTS incentives.generated_drop_proof
       (
           drop_id INT REFERENCES incentives.generated_drop (id) ON DELETE CASCADE,
@@ -84,7 +91,7 @@ export default async function initializeIncentivesClient() {
           address NUMERIC   NOT NULL,
           amount  NUMERIC   NOT NULL,
           proof   NUMERIC[] NOT NULL,
-          PRIMARY KEY (drop_id, id, address)
+          PRIMARY KEY (drop_id, id)
       );
 
       -- meant to be manually populated
