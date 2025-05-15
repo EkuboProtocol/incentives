@@ -47,7 +47,7 @@ interface PoolData {
 }
 
 // generic per-exchange mapping of pair ⇒ data[]
-type ExchangeData = Record<string, PoolData[]>;
+type ExchangeData = Record<`${string}/${string}`, PoolData[]>;
 
 interface ApiResponse {
   Ekubo: ExchangeData;
@@ -66,11 +66,49 @@ const incentiveData = (await incentiveDataResponse.json()) as ApiResponse;
 
 const ekuboIncentivesData = incentiveData.Ekubo;
 
-const client = await initializeIncentivesClient();
+const convertedToRows = Object.entries(ekuboIncentivesData).flatMap(
+  ([pair, data]) => {
+    if (pair === "Discretionary") return [];
 
-await client.query(`
-  CREATE TEMPORARY TABLE temp_campaign_reward_periods(name, name_slug, status);
-`);
+    const [symbolA, symbolB] = pair.split("/");
+
+    const tokenA = tokensJson.find((t) => t.symbol.toUpperCase() === symbolA);
+    const tokenB = tokensJson.find((t) => t.symbol.toUpperCase() === symbolB);
+
+    if (!tokenA || !tokenB) throw new Error(`Unrecognized pair: ${pair}`);
+
+    const [token0, token1] =
+      BigInt(tokenA.l2_token_address) < BigInt(tokenB.l2_token_address)
+        ? [BigInt(tokenA.l2_token_address), BigInt(tokenB.l2_token_address)]
+        : [BigInt(tokenB.l2_token_address), BigInt(tokenA.l2_token_address)];
+
+    const strkToken = tokensJson.find((t) => t.symbol === "STRK");
+
+    return data.map((d) => {
+      const startDate = new Date(`${d.date}T00:00:00Z`);
+      const endDate = new Date(startDate.getTime() + 86_400_000);
+      const realizedVolatility = d.thirty_day_realized_volatility;
+      const token0RewardAmount = BigInt(
+        d.token0_allocation * 10 ** strkToken.decimals,
+      );
+      const token1RewardAmount = BigInt(
+        d.token1_allocation * 10 ** strkToken.decimals,
+      );
+
+      return {
+        token0,
+        token1,
+        startDate,
+        endDate,
+        realizedVolatility,
+        token0RewardAmount,
+        token1RewardAmount,
+      };
+    });
+  },
+);
+
+const client = await initializeIncentivesClient();
 
 console.log("Finished import");
 
