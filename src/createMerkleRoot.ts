@@ -1,5 +1,5 @@
 import { Allocation } from "./util/airdrop.js";
-import { generateDrop } from "./util/generate-drop.js";
+import { generateAndInsertDrop } from "./util/generateAndInsertDrop.js";
 import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
 import { STARKNET_AIRDROP_CONTRACT_OPTIONS } from "./util/starknetAirdropContract.js";
 
@@ -65,13 +65,11 @@ const amounts: Allocation[] = rewardsRaw
   // amounts less than 0.0001 STRK are not included
   .filter(({ total }) => total >= 10n ** 13n)
   .sort(({ total: a }, { total: b }) => Number(b - a))
-  .map(({ total, owner }) => ({ claimee: owner, amount: total }));
+  .map(({ total, owner }) => ({ address: owner, amount: total }));
 
-const dropId = await generateDrop(
+const dropId = await generateAndInsertDrop(
   client,
   amounts,
-  startDate,
-  endDate,
   STARKNET_AIRDROP_CONTRACT_OPTIONS,
 );
 

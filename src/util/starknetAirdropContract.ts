@@ -1,5 +1,6 @@
 import { pedersen_from_hex } from "pedersen-fast";
 import { Claim } from "./airdrop.js";
+import { GenerateAndInsertDropOptions } from "./generateAndInsertDrop.js";
 
 const HASH_SELECTOR =
   0x01782c4dfd9b809591e597c7a90a503c5db310130ec93790567b00d95ac81da0n;
@@ -12,7 +13,7 @@ function claimHashFunction(claim: Claim): bigint {
           `0x${HASH_SELECTOR.toString(16)}`,
           `0x${claim.id.toString(16)}`,
         ),
-        `0x${claim.claimee.toString(16)}`,
+        `0x${claim.address.toString(16)}`,
       ),
       `0x${claim.amount.toString(16)}`,
     ),
@@ -32,7 +33,7 @@ function siblingHashFunction(left: bigint, right: bigint): bigint {
   }
 }
 
-export const STARKNET_AIRDROP_CONTRACT_OPTIONS = {
+export const STARKNET_AIRDROP_CONTRACT_OPTIONS: GenerateAndInsertDropOptions = {
   claimHashFunction,
   siblingHashFunction,
 };

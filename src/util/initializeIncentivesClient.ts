@@ -39,7 +39,7 @@ export default async function initializeIncentivesClient() {
           -- the amount available for rewards
           budget       NUMERIC     NOT NULL,
           -- the weights used for incentive calculations
-          price_weights INT NOT NULL REFERENCES incentives.stddevs_table,
+          stddevs_table_id INT NOT NULL REFERENCES incentives.stddevs_table,
           PRIMARY KEY (id)
       );
 

@@ -3,18 +3,19 @@ import {
   Claim,
   constructMerkleTree,
   generateProof,
+  SiblingHashFunction,
 } from "./airdrop.js";
 import { Client } from "pg";
 
-export async function generateDrop(
+export interface GenerateAndInsertDropOptions {
+  claimHashFunction(claim: Claim): bigint;
+  siblingHashFunction: SiblingHashFunction;
+}
+
+export async function generateAndInsertDrop(
   client: Client,
   allocations: Allocation[],
-  startDate: Date,
-  endDate: Date,
-  options: {
-    claimHashFunction(claim: Claim): bigint;
-    siblingHashFunction: Parameters<typeof constructMerkleTree>[1];
-  },
+  options: GenerateAndInsertDropOptions,
 ): Promise<number> {
   const claimsWithHashes: { claim: Claim; hash: bigint }[] = allocations
     .map((c, ix): Claim => ({ id: ix, ...c }))
@@ -39,20 +40,20 @@ export async function generateDrop(
     rows: [{ id: dropId }],
   } = await client.query({
     text: `
-            INSERT INTO generated_drop (root, start_date, end_date)
-            VALUES ($1, $2, $3)
+            INSERT INTO incentives.generated_drop (root)
+            VALUES ($1)
             RETURNING id;
         `,
-    values: [root, startDate, endDate],
+    values: [root],
   });
 
   const insertText = `
-        INSERT INTO generated_drop_proof (drop_id, id, claimee, amount, proof)
+        INSERT INTO incentives.generated_drop_proof (drop_id, id, address, amount, proof)
         VALUES
         ${claimsWithProofs
           .map(
-            ({ claim: { id, claimee, amount }, proof }) =>
-              `(${dropId}, ${id}, ${claimee}, ${amount}, '{${proof
+            ({ claim: { id, address, amount }, proof }) =>
+              `(${dropId}, ${id}, ${address}, ${amount}, '{${proof
                 .map((p) => p.toString())
                 .join(",")}}')`,
           )

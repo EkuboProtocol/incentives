@@ -18,8 +18,6 @@ try {
 
   console.log(`Found ${pendingRewardPeriods.length} periods to process`);
 
-  const PRICE_COMPUTATION_INTERVAL = "1 hour";
-
   for (const period of pendingRewardPeriods) {
     console.log(`Processing period ID ${period.id}`);
 
@@ -33,7 +31,7 @@ try {
 
     const queryText = `
         INSERT INTO incentives.computed_rewards (WITH period_info AS (SELECT *,
-                                                                             ROUND(LOG(EXP(realized_volatility)) / LOG(1.000001)) AS volatility_in_ticks
+                                                                             ROUND(LOG(EXP(realized_volatility)) / LOG(1.000001))::INT AS volatility_in_ticks
                                                                       FROM incentives.campaign_reward_periods
                                                                       WHERE id = :period_id),
 
@@ -67,22 +65,21 @@ try {
                                                                                   FROM period_info pi
                                                                                            JOIN incentives.campaigns c ON pi.campaign_id = c.id
                                                                                            JOIN incentives.stddevs_table_entries ste
-                                                                                                ON c.price_weights = ste.stddevs_table_id),
+                                                                                                ON c.stddevs_table_id = ste.stddevs_table_id),
 
-                                                      fee_calc AS (SELECT DISTINCT(fee),
+                                                      -- how strong a penalty to apply to liquidity
+                                                      fee_calc AS (SELECT DISTINCT(fee) AS fee,
                                                                                   int4(
-                                                                                          LOG(1::NUMERIC + (fee / 340282366920938463463374607431768211456)) /
-                                                                                          LOG(1.000001::NUMERIC)) *
-                                                                                  4 AS fee_ticks_penalty
+                                                                                          LOG(1::NUMERIC + (fee / 0x0100000000000000000000000000000000::NUMERIC)) /
+                                                                                          LOG(1.000001::NUMERIC)
+                                                                                  )     AS ticks_penalty
                                                                    FROM pool_keys),
 
                                                       -- all the pool keys related to the incentivized pools
                                                       relevant_pool_key_hashes
                                                           AS (SELECT pk.key_hash,
-                                                                     pk.token0,
-                                                                     pk.token1,
                                                                      pk.fee,
-                                                                     fc.fee_ticks_penalty
+                                                                     fc.ticks_penalty
                                                               FROM pool_keys pk
                                                                        JOIN period_info p
                                                                             ON p.token0 = pk.token0 AND
@@ -95,9 +92,7 @@ try {
                                                                             ON pk.fee = fc.fee),
 
                                                       interval_pair_prices_without_next_start
-                                                          AS (SELECT pool_keys.token0,
-                                                                     pool_keys.token1,
-                                                                     date_bin(
+                                                          AS (SELECT date_bin(
                                                                              INTERVAL :price_interval,
                                                                              blocks.time,
                                                                              '2000-01-01 00:00:00'::timestamptz) AS period_start,
@@ -107,10 +102,7 @@ try {
                                                                                SUM(ABS(swaps.delta0 * swaps.delta1))) /
                                                                            LOG(1.000001))::INT                   AS tick
                                                               FROM swaps
-                                                                       JOIN pool_keys
-                                                                            ON swaps.pool_key_hash = pool_keys.key_hash
-                                                                       JOIN period_info p
-                                                                            ON pool_keys.token0 = p.token0 AND pool_keys.token1 = p.token1
+                                                                       JOIN relevant_pool_key_hashes rpkh ON swaps.pool_key_hash = rpkh.key_hash
                                                                        JOIN event_keys ON swaps.event_id = event_keys.id
                                                                        JOIN blocks ON event_keys.block_number = blocks.number
                                                               WHERE event_id BETWEEN (SELECT id
@@ -119,30 +111,27 @@ try {
                                                                                             (SELECT number
                                                                                              FROM blocks,
                                                                                                   period_info
-                                                                                             WHERE time >=
-                                                                                                   start_time -
-                                                                                                   (4 * INTERVAL :price_interval)
+                                                                                             WHERE time >= start_time - (4 * INTERVAL :price_interval)
                                                                                              ORDER BY number
                                                                                              LIMIT 1)
                                                                                       ORDER BY id
                                                                                       LIMIT 1) AND (SELECT id FROM max_event_id)
                                                                 AND swaps.delta0 != 0
                                                                 AND swaps.delta1 != 0
-                                                              GROUP BY pool_keys.token0, pool_keys.token1, period_start),
+                                                              GROUP BY period_start),
 
                                                       interval_pair_prices AS (SELECT ipp.*,
-                                                                                      LEAD(period_start)
-                                                                                      OVER (PARTITION BY ipp.token0, ipp.token1, multiple ORDER BY period_start) AS next_period_start,
+                                                                                      LEAD(period_start) OVER (ORDER BY period_start) AS             next_period_start,
                                                                                       weight,
                                                                                       INT4RANGE(
                                                                                               CEIL(ipp.tick - multiple * volatility_in_ticks)::INT,
-                                                                                              ipp.tick::INT)                                                        stddev_range_lower,
+                                                                                              ipp.tick::INT)                                         stddev_range_lower,
                                                                                       INT4RANGE(
                                                                                               ipp.tick::INT,
-                                                                                              FLOOR(ipp.tick + multiple * volatility_in_ticks)::INT)                stddev_range_upper
+                                                                                              FLOOR(ipp.tick + multiple * volatility_in_ticks)::INT) stddev_range_upper
                                                                                FROM interval_pair_prices_without_next_start ipp,
-                                                                                    period_info
-                                                                                        JOIN stddev_multiple_weights ON TRUE),
+                                                                                    period_info,
+                                                                                    stddev_multiple_weights),
 
                                                       -- the state of all the positions aggregated at the beginning of the period
                                                       positions_created_before_start
@@ -227,18 +216,18 @@ try {
                                                                           WHEN lower_bound < ipp.tick THEN
                                                                               stddev_range_lower *
                                                                               INT4RANGE(lower_bound -
-                                                                                        rpkh.fee_ticks_penalty,
+                                                                                        rpkh.ticks_penalty,
                                                                                         LEAST(upper_bound, ipp.tick) -
-                                                                                        rpkh.fee_ticks_penalty)
+                                                                                        rpkh.ticks_penalty)
                                                                           ELSE INT4RANGE(ipp.tick, ipp.tick) END) AS tick_range_intersection_lower,
                                                                      (CASE
                                                                           WHEN upper_bound > ipp.tick THEN
                                                                               stddev_range_upper *
                                                                               INT4RANGE(
                                                                                       GREATEST(ipp.tick, lower_bound) +
-                                                                                      rpkh.fee_ticks_penalty,
+                                                                                      rpkh.ticks_penalty,
                                                                                       upper_bound +
-                                                                                      rpkh.fee_ticks_penalty)
+                                                                                      rpkh.ticks_penalty)
                                                                           ELSE INT4RANGE(ipp.tick, ipp.tick) END) AS tick_range_intersection_upper,
                                                                      weight,
                                                                      ipp.tick,
@@ -261,9 +250,8 @@ try {
 
                                                               FROM position_states_during_period psdp
                                                                        JOIN relevant_pool_key_hashes rpkh ON psdp.pool_key_hash = rpkh.key_hash
-                                                                       LEFT JOIN interval_pair_prices ipp
-                                                                                 ON rpkh.token0 = ipp.token0 AND rpkh.token1 = ipp.token1
-                                                                       JOIN period_info p ON rpkh.token0 = p.token0 AND rpkh.token1 = p.token1),
+                                                                       CROSS JOIN interval_pair_prices ipp,
+                                                                   period_info p),
 
                                                       position_depth_per_time
                                                           AS (SELECT pool_key_hash AS pool_key_hash,
@@ -345,16 +333,19 @@ try {
                                                                                            WHERE ppds.total_score_lower > 0
                                                                                               OR ppds.total_score_upper > 0)
 
-                                                 SELECT :period_id                         AS campaign_reward_period_id,
+                                                 SELECT :period_id                                                              AS campaign_reward_period_id,
                                                         locker,
                                                         salt,
-                                                        (position_rewards_share * period_info.token0_reward_amount +
-                                                         period_info.token1_reward_amount) AS incentives
+                                                        (position_rewards_share *
+                                                         (period_info.token0_reward_amount + period_info.token1_reward_amount)) AS incentives
                                                  FROM position_percent_of_pair_rewards ppopr,
                                                       period_info);
     `;
 
-    await client.query(queryText);
+    await client.query({
+      text: queryText,
+      values: [period.id],
+    });
   }
 
   await client.query(`COMMIT;`);

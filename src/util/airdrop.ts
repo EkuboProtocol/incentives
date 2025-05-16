@@ -1,14 +1,17 @@
-export interface Claim {
-  id: number;
-  claimee: bigint;
+export interface Allocation {
+  address: bigint;
   amount: bigint;
 }
 
-export type Allocation = Omit<Claim, "id">;
+export interface Claim extends Allocation {
+  id: number;
+}
+
+export type SiblingHashFunction = (left: bigint, right: bigint) => bigint;
 
 export function constructMerkleTree(
   claimHashes: bigint[],
-  hashFunction: (left: bigint, right: bigint) => bigint,
+  hashFunction: SiblingHashFunction,
 ): {
   root: bigint;
   layers: bigint[][];

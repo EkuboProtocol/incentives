@@ -1,5 +1,5 @@
 import { Allocation } from "./util/airdrop.js";
-import { generateDrop } from "./util/generate-drop.js";
+import { generateAndInsertDrop } from "./util/generateAndInsertDrop.js";
 import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
 import { STARKNET_AIRDROP_CONTRACT_OPTIONS } from "./util/starknetAirdropContract.js";
 
@@ -91,17 +91,11 @@ const amounts: Allocation[] = votes
     owner: BigInt(delegator),
     total: (BigInt(votes_contributed) * totalReward) / totalVotes,
   }))
-  .map(({ total, owner }) => ({ claimee: owner, amount: total }));
+  .map(({ total, owner }) => ({ address: owner, amount: total }));
 
-const startDate = new Date(
-  proposalTimeQuery[0].time.getTime() + PROPOSAL_VOTING_DELAY * 1000,
-);
-const endDate = new Date(startDate.getTime() + PROPOSAL_VOTING_PERIOD * 1000);
-const dropId = await generateDrop(
+const dropId = await generateAndInsertDrop(
   client,
   amounts,
-  startDate,
-  endDate,
   STARKNET_AIRDROP_CONTRACT_OPTIONS,
 );
 

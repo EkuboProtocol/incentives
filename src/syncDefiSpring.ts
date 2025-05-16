@@ -1,6 +1,7 @@
 import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
-import { fetchEkuboDefiSpringData } from "./util/defi-spring-api.js";
+import { fetchEkuboDefiSpringData } from "./util/defiSpringApi.js";
 import { fetchTokens } from "./util/tokens.js";
+import { floatToRawValue } from "./util/floatToRawValue.js";
 
 const campaignSlug = process.env.CAMPAIGN_SLUG ?? "starknet_defi_spring";
 
@@ -36,10 +37,10 @@ const incentiveRewardPeriodRowData = Object.entries(
     const endDate = new Date(startDate.getTime() + 86_400_000);
     const realizedVolatility = d.thirty_day_realized_volatility;
     const token0RewardAmount = BigInt(
-      d.token0_allocation * 10 ** strkToken.decimals,
+      floatToRawValue(d.token0_allocation, strkToken.decimals),
     );
     const token1RewardAmount = BigInt(
-      d.token1_allocation * 10 ** strkToken.decimals,
+      floatToRawValue(d.token1_allocation, strkToken.decimals),
     );
 
     return {
