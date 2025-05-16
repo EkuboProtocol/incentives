@@ -1,19 +1,11 @@
-name: Compute user allocations
+name: Compute distributions
 
 on:
   schedule:
     - cron: "0 */1 * * *"
   workflow_dispatch:
-    inputs:
-      run_dates:
-        description: "A comma separated list of ISO dates, e.g. 2024-02-23,2024-02-24 for which to run the computation"
-      overwrite:
-        type: boolean
-        description: "Whether to overwrite data for the given date if it exists"
-        required: true
-        default: true
 
-concurrency: query
+concurrency: distributions
 
 jobs:
   run:

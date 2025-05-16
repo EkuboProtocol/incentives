@@ -9,6 +9,20 @@ export default async function initializeIncentivesClient() {
   await client.query(`
       CREATE SCHEMA IF NOT EXISTS incentives;
 
+      CREATE TABLE IF NOT EXISTS incentives.stddevs_table
+      (
+          id   SERIAL  NOT NULL,
+          name VARCHAR NOT NULL,
+          PRIMARY KEY (id)
+      );
+
+      CREATE TABLE IF NOT EXISTS incentives.stddevs_table_entries
+      (
+          stddevs_table_id INT   NOT NULL REFERENCES incentives.stddevs_table (id) ON DELETE CASCADE,
+          multiple         FLOAT NOT NULL,
+          weight           FLOAT NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS incentives.campaigns
       (
           id           SERIAL8     NOT NULL,
@@ -24,10 +38,19 @@ export default async function initializeIncentivesClient() {
           reward_token NUMERIC     NOT NULL,
           -- the amount available for rewards
           budget       NUMERIC     NOT NULL,
+          -- the weights used for incentive calculations
+          price_weights INT NOT NULL REFERENCES incentives.stddevs_table,
           PRIMARY KEY (id)
       );
 
       CREATE UNIQUE INDEX IF NOT EXISTS idx_incentive_campaigns_slug ON incentives.campaigns (slug);
+
+      CREATE TABLE IF NOT EXISTS incentives.campaigns_allowed_extension
+      (
+          campaign_id INT REFERENCES incentives.campaigns (id) ON DELETE CASCADE,
+          extension   NUMERIC NOT NULL,
+          PRIMARY KEY (campaign_id, extension)
+      );
 
       -- specific dates on which rewards are provided to pairs
       CREATE TABLE IF NOT EXISTS incentives.campaign_reward_periods
