@@ -1,7 +1,7 @@
-import { Allocation } from "./airdrop.js";
-import { generateDrop } from "./generate-drop.js";
-import initializeIncentivesClient from "./initializeIncentivesClient.js";
-import { STARKNET_AIRDROP_CONTRACT_OPTIONS } from "./starknetAirdropContract.js";
+import { Allocation } from "./util/airdrop.js";
+import { generateDrop } from "./util/generate-drop.js";
+import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
+import { STARKNET_AIRDROP_CONTRACT_OPTIONS } from "./util/starknetAirdropContract.js";
 
 const endDate = process.env.END_DATE
   ? new Date(`${process.env.END_DATE}T00:00:00Z`)

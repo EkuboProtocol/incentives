@@ -1,6 +1,7 @@
-import { Allocation } from "./airdrop.js";
-import { generateDrop } from "./generate-drop.js";
-import initializeIncentivesClient from "./initializeIncentivesClient.js";
+import { Allocation } from "./util/airdrop.js";
+import { generateDrop } from "./util/generate-drop.js";
+import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
+import { STARKNET_AIRDROP_CONTRACT_OPTIONS } from "./util/starknetAirdropContract.js";
 
 const proposalId = BigInt(process.env.PROPOSAL_ID);
 const totalReward = BigInt(process.env.TOTAL_REWARD);
@@ -13,12 +14,12 @@ await client.query("BEGIN;");
 
 const { rows: proposalTimeQuery } = await client.query<{ time: Date }>({
   text: `
-        SELECT time
-        FROM governor_proposed gp
-                 JOIN event_keys ek ON gp.event_id = ek.id
-                 JOIN blocks b ON ek.block_number = b.number
-        WHERE gp.id = $1
-    `,
+    SELECT time
+    FROM governor_proposed gp
+           JOIN event_keys ek ON gp.event_id = ek.id
+           JOIN blocks b ON ek.block_number = b.number
+    WHERE gp.id = $1
+  `,
   values: [proposalId],
 });
 
@@ -96,7 +97,13 @@ const startDate = new Date(
   proposalTimeQuery[0].time.getTime() + PROPOSAL_VOTING_DELAY * 1000,
 );
 const endDate = new Date(startDate.getTime() + PROPOSAL_VOTING_PERIOD * 1000);
-const dropId = await generateDrop(client, amounts, startDate, endDate);
+const dropId = await generateDrop(
+  client,
+  amounts,
+  startDate,
+  endDate,
+  STARKNET_AIRDROP_CONTRACT_OPTIONS,
+);
 
 console.log("Created drop ID", dropId);
 

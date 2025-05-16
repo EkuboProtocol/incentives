@@ -1,4 +1,4 @@
-import initializeIncentivesClient from "./initializeIncentivesClient.js";
+import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
 
 const incentiveDataResponse = await fetch(
   "https://mainnet-api.ekubo.org/defi-spring-incentives",

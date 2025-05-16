@@ -1,5 +1,5 @@
 import { Account, RpcProvider } from "starknet";
-import initializeIncentivesClient from "./initializeIncentivesClient.js";
+import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
 
 const dropId = process.env.DROP_ID;
 
