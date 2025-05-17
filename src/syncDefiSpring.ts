@@ -32,27 +32,29 @@ const incentiveRewardPeriodRowData = Object.entries(
 
   const strkToken = tokens.find((t) => t.symbol === "STRK");
 
-  return data.map((d) => {
-    const startDate = new Date(`${d.date}T00:00:00Z`);
-    const endDate = new Date(startDate.getTime() + 86_400_000);
-    const realizedVolatility = d.thirty_day_realized_volatility;
-    const token0RewardAmount = BigInt(
-      floatToRawValue(d.token0_allocation, strkToken.decimals),
-    );
-    const token1RewardAmount = BigInt(
-      floatToRawValue(d.token1_allocation, strkToken.decimals),
-    );
+  return data
+    .map((d) => {
+      const startDate = new Date(`${d.date}T00:00:00Z`);
+      const endDate = new Date(startDate.getTime() + 86_400_000);
+      const realizedVolatility = d.thirty_day_realized_volatility;
+      const token0RewardAmount = BigInt(
+        floatToRawValue(d.token0_allocation, strkToken.decimals),
+      );
+      const token1RewardAmount = BigInt(
+        floatToRawValue(d.token1_allocation, strkToken.decimals),
+      );
 
-    return {
-      token0,
-      token1,
-      startDate,
-      endDate,
-      realizedVolatility,
-      token0RewardAmount,
-      token1RewardAmount,
-    };
-  });
+      return {
+        token0,
+        token1,
+        startDate,
+        endDate,
+        realizedVolatility,
+        token0RewardAmount,
+        token1RewardAmount,
+      };
+    })
+    .filter((d) => d.token0RewardAmount !== 0n || d.token1RewardAmount !== 0n);
 });
 
 const client = await initializeIncentivesClient();

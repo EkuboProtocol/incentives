@@ -25,21 +25,21 @@ export default async function initializeIncentivesClient() {
 
       CREATE TABLE IF NOT EXISTS incentives.campaigns
       (
-          id           SERIAL8     NOT NULL,
+          id               SERIAL8     NOT NULL,
           -- when the campaign is expected to start
-          start_time   timestamptz NOT NULL,
+          start_time       timestamptz NOT NULL,
           -- when campaign will end, if it is known
-          end_time     timestamptz,
+          end_time         timestamptz,
           -- the name of the campaign
-          name         TEXT        NOT NULL,
+          name             TEXT        NOT NULL,
 
-          slug         VARCHAR(20) NOT NULL,
+          slug             VARCHAR(20) NOT NULL,
           -- the token that is being used for rewards
-          reward_token NUMERIC     NOT NULL,
+          reward_token     NUMERIC     NOT NULL,
           -- the amount available for rewards
-          budget       NUMERIC     NOT NULL,
+          budget           NUMERIC     NOT NULL,
           -- the weights used for incentive calculations
-          stddevs_table_id INT NOT NULL REFERENCES incentives.stddevs_table,
+          stddevs_table_id INT         NOT NULL REFERENCES incentives.stddevs_table,
           PRIMARY KEY (id)
       );
 
@@ -100,7 +100,11 @@ export default async function initializeIncentivesClient() {
       CREATE TABLE IF NOT EXISTS incentives.generated_drop_reward_periods
       (
           drop_id                   int8 NOT NULL REFERENCES incentives.generated_drop (id) ON DELETE CASCADE,
-          campaign_reward_period_id int8 NOT NULL REFERENCES incentives.campaign_reward_periods (id) ON DELETE CASCADE
+
+          -- this should not cascade, because it means the source of the data is being deleted
+          campaign_reward_period_id int8 NOT NULL REFERENCES incentives.campaign_reward_periods (id),
+          
+          PRIMARY KEY (drop_id, campaign_reward_period_id)
       );
 
       -- this prevents us from including the same period id in multiple drops
