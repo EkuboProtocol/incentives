@@ -20,8 +20,12 @@ const incentiveRewardPeriodRowData = Object.entries(
 ).flatMap(([pair, data]) => {
   const [symbolA, symbolB] = pair.split("/");
 
-  const tokenA = tokens.find((t) => t.symbol.toUpperCase() === symbolA);
-  const tokenB = tokens.find((t) => t.symbol.toUpperCase() === symbolB);
+  const tokenA = tokens.find(
+    (t) => t.symbol.toUpperCase() === symbolA.toUpperCase(),
+  );
+  const tokenB = tokens.find(
+    (t) => t.symbol.toUpperCase() === symbolB.toUpperCase(),
+  );
 
   if (!tokenA || !tokenB) throw new Error(`Unrecognized pair: ${pair}`);
 
@@ -38,10 +42,16 @@ const incentiveRewardPeriodRowData = Object.entries(
       const endDate = new Date(startDate.getTime() + 86_400_000);
       const realizedVolatility = d.thirty_day_realized_volatility;
       const token0RewardAmount = BigInt(
-        floatToRawValue(d.token0_allocation, strkToken.decimals),
+        floatToRawValue(
+          "token0_allocation" in d ? d.token0_allocation : d.allocation / 2,
+          strkToken.decimals,
+        ),
       );
       const token1RewardAmount = BigInt(
-        floatToRawValue(d.token1_allocation, strkToken.decimals),
+        floatToRawValue(
+          "token1_allocation" in d ? d.token1_allocation : d.allocation / 2,
+          strkToken.decimals,
+        ),
       );
 
       return {

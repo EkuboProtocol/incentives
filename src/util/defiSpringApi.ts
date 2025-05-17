@@ -1,13 +1,18 @@
-// common pool data shape
-interface PoolData {
+interface PoolDataV0 {
   date: string;
   allocation: number;
-  token0_allocation: number;
-  token1_allocation: number;
   thirty_day_realized_volatility: number;
 }
 
-export type ExchangeData = Record<`${string}/${string}`, PoolData[]>;
+interface PoolDataV1 extends PoolDataV0 {
+  token0_allocation: number;
+  token1_allocation: number;
+}
+
+export type ExchangeData = Record<
+  `${string}/${string}`,
+  (PoolDataV0 | PoolDataV1)[]
+>;
 
 interface OBLApiResponse {
   Ekubo: ExchangeData;
@@ -38,8 +43,10 @@ function addIncentivesToPoolData(
     const dayData = pairDailyData.find((d) => d.date === date);
     if (dayData) {
       dayData.allocation += amount;
-      dayData.token0_allocation += amount / 2;
-      dayData.token1_allocation += amount / 2;
+      if ("token0_allocation" in dayData) {
+        dayData.token0_allocation += amount / 2;
+        dayData.token1_allocation += amount / 2;
+      }
     } else {
       pairDailyData.push({
         date,
