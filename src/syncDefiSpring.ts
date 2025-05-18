@@ -20,19 +20,23 @@ const incentiveRewardPeriodRowData = Object.entries(
 ).flatMap(([pair, data]) => {
   const [symbolA, symbolB] = pair.split("/");
 
-  const tokenA = tokens.find(
+  const tokenA = tokens.filter(
     (t) => t.symbol.toUpperCase() === symbolA.toUpperCase(),
   );
-  const tokenB = tokens.find(
+  const tokenB = tokens.filter(
     (t) => t.symbol.toUpperCase() === symbolB.toUpperCase(),
   );
 
-  if (!tokenA || !tokenB) throw new Error(`Unrecognized pair: ${pair}`);
+  if (tokenA.length !== 1 || tokenB.length !== 1)
+    throw new Error(`Unrecognized pair: ${pair}`);
 
   const [token0, token1] =
-    BigInt(tokenA.l2_token_address) < BigInt(tokenB.l2_token_address)
-      ? [BigInt(tokenA.l2_token_address), BigInt(tokenB.l2_token_address)]
-      : [BigInt(tokenB.l2_token_address), BigInt(tokenA.l2_token_address)];
+    BigInt(tokenA[0].l2_token_address) < BigInt(tokenB[0].l2_token_address)
+      ? [BigInt(tokenA[0].l2_token_address), BigInt(tokenB[0].l2_token_address)]
+      : [
+          BigInt(tokenB[0].l2_token_address),
+          BigInt(tokenA[0].l2_token_address),
+        ];
 
   const strkToken = tokens.find((t) => t.symbol === "STRK");
 
