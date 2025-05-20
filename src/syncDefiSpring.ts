@@ -3,17 +3,23 @@ import { fetchEkuboDefiSpringData } from "./util/defiSpringApi.js";
 import { fetchTokens } from "./util/tokens.js";
 import { floatToRawValue } from "./util/floatToRawValue.js";
 
-const campaignSlug = process.env.CAMPAIGN_SLUG ?? "starknet_defi_spring";
+const campaignSlug = process.env.CAMPAIGN_SLUG || "starknet_defi_spring";
 
 const [ekuboIncentivesData, tokens] = await Promise.all([
   fetchEkuboDefiSpringData(
-    process.env.DEFI_SPRING_INCENTIVES_URL ??
+    process.env.DEFI_SPRING_INCENTIVES_URL ||
       "https://kx58j6x5me.execute-api.us-east-1.amazonaws.com/starknet/fetchFile?file=strk_grant.json",
   ),
   fetchTokens(
-    process.env.TOKENS_URL ?? "https://starknet-mainnet-api.ekubo.org/tokens",
+    process.env.TOKENS_URL || "https://starknet-mainnet-api.ekubo.org/tokens",
   ),
 ]);
+
+const tokensWithStrkSymbol = tokens.filter((t) => t.symbol === "STRK");
+
+if (tokensWithStrkSymbol.length !== 1) throw new Error("No STRK token found");
+
+const strkToken = tokensWithStrkSymbol[0];
 
 const incentiveRewardPeriodRowData = Object.entries(
   ekuboIncentivesData,
@@ -37,8 +43,6 @@ const incentiveRewardPeriodRowData = Object.entries(
           BigInt(tokenB[0].l2_token_address),
           BigInt(tokenA[0].l2_token_address),
         ];
-
-  const strkToken = tokens.find((t) => t.symbol === "STRK");
 
   return data
     .map((d) => {

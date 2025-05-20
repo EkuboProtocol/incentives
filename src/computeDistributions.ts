@@ -5,20 +5,27 @@ const client = await initializeIncentivesClient();
 try {
   await client.query("BEGIN;");
 
-  const { rows: pendingRewardPeriods } = await client.query<{
-    id: string;
-  }>(
-    `
-      SELECT id
-      FROM incentives.campaign_reward_periods
-      WHERE rewards_last_computed_at IS NULL
-        AND end_time <= CURRENT_TIMESTAMP
-    `,
-  );
+  const rewardPeriodIds = process.env.REWARD_PERIODS
+    ? process.env.REWARD_PERIODS.split(",").map((p) => p.trim())
+    : (
+        await client.query<{
+          id: string;
+        }>({
+          text: `
+              SELECT id
+              FROM incentives.campaign_reward_periods
+              WHERE rewards_last_computed_at IS NULL
+                AND end_time <= CURRENT_TIMESTAMP
+              ORDER BY end_time
+              LIMIT $1
+          `,
+          values: [10],
+        })
+      ).rows.map(({ id }) => id);
 
-  console.log(`Found ${pendingRewardPeriods.length} periods to process`);
+  console.log(`Found ${rewardPeriodIds.length} periods to process`);
 
-  for (const { id } of pendingRewardPeriods.slice(0, 2)) {
+  for (const id of rewardPeriodIds) {
     console.log(`Processing period ID ${id}`);
 
     // first delete all the data for the day
@@ -32,8 +39,8 @@ try {
     await client.query({
       text: `
           INSERT INTO incentives.computed_rewards (WITH period_info AS (SELECT *,
-                                                                               ROUND(LOG(EXP(realized_volatility)) / LOG(1.000001))::INT      AS volatility_in_ticks,
-                                                                               GREATEST((end_time - start_time)::INTERVAL / 30, '10 minutes') AS price_interval
+                                                                               ROUND(LOG(EXP(realized_volatility)) / LOG(1.000001))::INT   AS volatility_in_ticks,
+                                                                               GREATEST((end_time - start_time)::INTERVAL / 30, '1 hours') AS price_interval
                                                                         FROM incentives.campaign_reward_periods
                                                                         WHERE id = $1),
 
@@ -61,6 +68,7 @@ try {
                                                                          ORDER BY id DESC
                                                                          LIMIT 1),
 
+
                                                         -- the weights corresponding to each multiple of the standard deviation
                                                         stddev_multiple_weights AS (SELECT multiple,
                                                                                            (weight - COALESCE(LAG(weight) OVER (ORDER BY multiple), 0)) AS weight
@@ -69,29 +77,22 @@ try {
                                                                                              JOIN incentives.stddevs_table_entries ste
                                                                                                   ON c.stddevs_table_id = ste.stddevs_table_id),
 
-                                                        -- how strong a penalty to apply to liquidity
-                                                        fee_calc AS (SELECT DISTINCT(fee) AS fee,
-                                                                                    int4(
-                                                                                            LOG(1::NUMERIC + (fee / $2::NUMERIC)) /
-                                                                                            LOG(1.000001::NUMERIC)
-                                                                                    )     AS ticks_penalty
-                                                                     FROM pool_keys),
-
                                                         -- all the pool keys related to the incentivized pools
                                                         relevant_pool_key_hashes
                                                             AS (SELECT pk.key_hash,
-                                                                       pk.fee,
-                                                                       fc.ticks_penalty
+                                                                       int4(
+                                                                               LOG(1::NUMERIC + (fee / $2::NUMERIC)) /
+                                                                               LOG(1.000001::NUMERIC)
+                                                                       ) AS mid_distance_in_ticks
                                                                 FROM pool_keys pk
                                                                          JOIN period_info p
                                                                               ON p.token0 = pk.token0 AND
                                                                                  p.token1 = pk.token1 AND
                                                                                   -- one of the allowed extensions
-                                                                                 extension IN (SELECT cae.extension
-                                                                                               FROM incentives.campaigns_allowed_extension cae
-                                                                                               WHERE cae.campaign_id = p.campaign_id)
-                                                                         JOIN fee_calc fc
-                                                                              ON pk.fee = fc.fee),
+                                                                                 extension IN
+                                                                                 (SELECT cae.extension
+                                                                                  FROM incentives.campaigns_allowed_extension cae
+                                                                                  WHERE cae.campaign_id = p.campaign_id)),
 
                                                         interval_pair_prices_without_next_start
                                                             AS (SELECT date_bin(
@@ -124,14 +125,14 @@ try {
                                                                 GROUP BY period_start),
 
                                                         interval_pair_prices AS (SELECT ipp.*,
-                                                                                        LEAD(period_start) OVER (ORDER BY period_start) AS             next_period_start,
+                                                                                        LEAD(period_start) OVER (PARTITION BY multiple ORDER BY period_start) AS next_period_start,
                                                                                         weight,
                                                                                         INT4RANGE(
                                                                                                 CEIL(ipp.tick - multiple * volatility_in_ticks)::INT,
-                                                                                                ipp.tick::INT)                                         stddev_range_lower,
+                                                                                                ipp.tick::INT)                                                   stddev_range_lower,
                                                                                         INT4RANGE(
                                                                                                 ipp.tick::INT,
-                                                                                                FLOOR(ipp.tick + multiple * volatility_in_ticks)::INT) stddev_range_upper
+                                                                                                FLOOR(ipp.tick + multiple * volatility_in_ticks)::INT)           stddev_range_upper
                                                                                  FROM interval_pair_prices_without_next_start ipp,
                                                                                       period_info,
                                                                                       stddev_multiple_weights),
@@ -197,11 +198,13 @@ try {
                                                                                                  lower_bound,
                                                                                                  upper_bound,
 
-                                                                                                 SUM(liquidity_delta)
+                                                                                                 SUM(
+                                                                                                 liquidity_delta)
                                                                                                  OVER (PARTITION BY pool_key_hash, locker, salt, lower_bound, upper_bound ORDER BY update_event_id) AS liquidity,
 
                                                                                                  update_event_id,
-                                                                                                 LEAD(update_event_id)
+                                                                                                 LEAD(
+                                                                                                 update_event_id)
                                                                                                  OVER (PARTITION BY pool_key_hash, locker, salt, lower_bound, upper_bound ORDER BY update_event_id) AS next_update_event_id,
 
                                                                                                  update_time,
@@ -219,18 +222,18 @@ try {
                                                                             WHEN lower_bound < ipp.tick THEN
                                                                                 stddev_range_lower *
                                                                                 INT4RANGE(lower_bound -
-                                                                                          rpkh.ticks_penalty,
+                                                                                          rpkh.mid_distance_in_ticks,
                                                                                           LEAST(upper_bound, ipp.tick) -
-                                                                                          rpkh.ticks_penalty)
+                                                                                          rpkh.mid_distance_in_ticks)
                                                                             ELSE INT4RANGE(ipp.tick, ipp.tick) END) AS tick_range_intersection_lower,
                                                                        (CASE
                                                                             WHEN upper_bound > ipp.tick THEN
                                                                                 stddev_range_upper *
                                                                                 INT4RANGE(
                                                                                         GREATEST(ipp.tick, lower_bound) +
-                                                                                        rpkh.ticks_penalty,
+                                                                                        rpkh.mid_distance_in_ticks,
                                                                                         upper_bound +
-                                                                                        rpkh.ticks_penalty)
+                                                                                        rpkh.mid_distance_in_ticks)
                                                                             ELSE INT4RANGE(ipp.tick, ipp.tick) END) AS tick_range_intersection_upper,
                                                                        weight,
                                                                        ipp.tick,
@@ -303,7 +306,7 @@ try {
                                                                                    FROM position_depth_per_time
                                                                                    GROUP BY pool_key_hash, locker, salt),
 
-                                                        -- compute each position's total market depth score on the lower and upper side 
+                                                        -- compute each position's total market depth score on the lower and upper side
                                                         position_pair_score_seconds AS (SELECT locker,
                                                                                                salt,
                                                                                                SUM(market_depth_score_lower) AS total_score_lower,
@@ -330,32 +333,34 @@ try {
                                                                                   total_score_seconds tdspp,
                                                                                   period_info pi)
 
-                                                   SELECT $1 AS campaign_reward_period_id,
+                                                   SELECT pi.id, -- campaign period id
                                                           locker,
                                                           salt,
                                                           incentives
-                                                   FROM position_rewards pr
+                                                   FROM position_rewards pr,
+                                                        period_info pi
                                                    WHERE incentives > 0);
       `,
       values: [
         // the period
         id,
         // fee denominator
+        // to increase effect of fee, decrease the denominator, e.g. double effect by halving fee denominator
         0x0100000000000000000000000000000000n,
       ],
     });
 
     await client.query({
       text: `UPDATE incentives.campaign_reward_periods
-             SET rewards_last_computed_at = CURRENT_TIMESTAMP
-             WHERE id = $1`,
+                   SET rewards_last_computed_at = CURRENT_TIMESTAMP
+                   WHERE id = $1`,
       values: [id],
     });
   }
 
   await client.query(`COMMIT;`);
   console.log(
-    `Successfully finished processing ${pendingRewardPeriods.length} periods`,
+    `Successfully finished processing ${rewardPeriodIds.length} periods`,
   );
 } catch (e) {
   console.error("Encountered error", e);
