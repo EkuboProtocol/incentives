@@ -28,6 +28,8 @@ try {
   for (const id of rewardPeriodIds) {
     console.log(`Processing period ID ${id}`);
 
+    const processingStartTime = new Date().getTime();
+
     // first delete all the data for the day
     await client.query({
       text: `DELETE
@@ -356,6 +358,10 @@ try {
                    WHERE id = $1`,
       values: [id],
     });
+
+    console.log(
+      `Finished processing period ${id} in ${(new Date().getTime() - processingStartTime) / 1000} seconds`,
+    );
   }
 
   await client.query(`COMMIT;`);
