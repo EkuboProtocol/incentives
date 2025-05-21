@@ -5,7 +5,6 @@
     "sync-defi-spring": "tsx src/syncDefiSpring.ts",
     "compute-distributions": "tsx src/computeDistributions.ts",
     "create-root": "tsx src/createMerkleRoot.ts",
-    "voter-root": "tsx src/createVoterRoot.ts",
     "deploy-airdrop-contract": "tsx src/deployAirdropContract.ts",
     "test": "vitest"
   },

@@ -15,6 +15,7 @@ export interface GenerateAndInsertDropOptions {
 export async function generateAndInsertDrop(
   client: Client,
   allocations: Allocation[],
+  rewardPeriodIds: (string | bigint)[],
   options: GenerateAndInsertDropOptions,
 ): Promise<number> {
   const claimsWithHashes: { claim: Claim; hash: bigint }[] = allocations
@@ -40,11 +41,19 @@ export async function generateAndInsertDrop(
     rows: [{ id: dropId }],
   } = await client.query({
     text: `
-            INSERT INTO incentives.generated_drop (root)
-            VALUES ($1)
-            RETURNING id;
-        `,
+      INSERT INTO incentives.generated_drop (root)
+      VALUES ($1)
+      RETURNING id;
+    `,
     values: [root],
+  });
+
+  await client.query({
+    text: `
+      INSERT INTO incentives.generated_drop_reward_periods (drop_id, campaign_reward_period_id)
+      VALUES ${rewardPeriodIds.map((rp) => `($1, ${rp})`).join(",\n")};
+    `,
+    values: [dropId],
   });
 
   const insertText = `
