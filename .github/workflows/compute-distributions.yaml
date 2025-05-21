@@ -9,6 +9,14 @@ concurrency: distributions
 
 jobs:
   run:
+    strategy:
+      matrix:
+        database:
+          - "eth_sepolia"
+          - "sepolia"
+          - "eth_mainnet"
+          - "mainnet"
+
     runs-on: ubuntu-latest
     name: Run
     steps:
@@ -26,9 +34,9 @@ jobs:
         env:
           PGHOST: ${{ secrets.POSTGRES_HOST }}
           PGPORT: ${{ secrets.POSTGRES_PORT }}
-          PGDATABASE: ${{ secrets.POSTGRES_DB }}
           PGUSER: ${{ secrets.POSTGRES_USERNAME }}
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          PGDATABASE: ${{ matrix.database }}
           PGSSLMODE: require
           NODE_TLS_REJECT_UNAUTHORIZED: 0
           RUN_DATES: ${{ inputs.run_dates }}
