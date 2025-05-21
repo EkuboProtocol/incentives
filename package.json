@@ -6,6 +6,7 @@
     "compute-distributions": "tsx src/computeDistributions.ts",
     "create-root": "tsx src/createMerkleRoot.ts",
     "deploy-airdrop-contract": "tsx src/deployAirdropContract.ts",
+    "init-schema": "tsx src/initSchema.ts",
     "test": "vitest"
   },
   "author": "Moody Salem",
