@@ -2,10 +2,11 @@
   "name": "defi-spring",
   "version": "1.0.0",
   "scripts": {
-    "compute-distributions": "tsx compute-distributions.ts",
-    "create-root": "tsx create-root.ts",
-    "voter-root": "tsx voter-root.ts",
-    "deploy-airdrop-contract": "tsx deploy-airdrop-contract.ts"
+    "sync-defi-spring": "tsx src/syncDefiSpring.ts",
+    "compute-distributions": "tsx src/computeDistributions.ts",
+    "create-root": "tsx src/createMerkleRoot.ts",
+    "deploy-airdrop-contract": "tsx src/deployAirdropContract.ts",
+    "test": "vitest"
   },
   "author": "Moody Salem",
   "type": "module",
@@ -13,8 +14,11 @@
     "@types/pg": "^8.11.2",
     "pedersen-fast": "^0.4.0",
     "pg": "^8.11.3",
-    "starknet": "^6.12.1",
+    "starknet": "^6.24.1",
     "tsx": "^4.7.1",
     "typescript": "^5.3.3"
+  },
+  "devDependencies": {
+    "vitest": "^3.1.3"
   }
 }

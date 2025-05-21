@@ -1,0 +1,52 @@
+name: Sync DeFi Spring
+
+on:
+  schedule:
+    - cron: "*/15 0-8 * * *"
+  workflow_dispatch:
+    inputs:
+      campaign_slug:
+        required: false
+        default: "starknet_defi_spring"
+        type: "string"
+        description: "The slug of the campaign where the rewards should be entered"
+      defi_spring_incentives_url:
+        required: false
+        default: "https://kx58j6x5me.execute-api.us-east-1.amazonaws.com/starknet/fetchFile?file=strk_grant.json"
+        description: "The URL of the DeFi Spring Incentives to sync"
+      tokens_url:
+        required: false
+        default: "https://starknet-mainnet-api.ekubo.org/tokens"
+        description: "The URL of the Starknet tokens information endpoint"
+
+concurrency: sync-defi-spring
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    name: Run
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - run: npm install
+
+      - name: Sync
+        env:
+          PGHOST: ${{ secrets.POSTGRES_HOST }}
+          PGPORT: ${{ secrets.POSTGRES_PORT }}
+          PGDATABASE: ${{ secrets.POSTGRES_DB }}
+          PGUSER: ${{ secrets.POSTGRES_USERNAME }}
+          PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          PGSSLMODE: require
+          NODE_TLS_REJECT_UNAUTHORIZED: 0
+          CAMPAIGN_SLUG: ${{ inputs.campaign_slug }}
+          DEFI_SPRING_INCENTIVES_URL: ${{ inputs.defi_spring_incentives_url }}
+          TOKENS_URL: ${{ inputs.tokens_url }}
+
+        run: npm run sync-defi-spring

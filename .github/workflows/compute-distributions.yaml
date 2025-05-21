@@ -1,16 +1,11 @@
-name: Create voter drop
+name: Compute distributions
 
 on:
+  schedule:
+    - cron: "0 */1 * * *"
   workflow_dispatch:
-    inputs:
-      proposal_id:
-        required: true
-        description: "The` ID of the proposal for which to create the drop"
-      total_reward:
-        required: true
-        description: "The total reward in wei of token"
 
-concurrency: query
+concurrency: distributions
 
 jobs:
   run:
@@ -27,7 +22,7 @@ jobs:
 
       - run: npm install
 
-      - name: Generate voter drop
+      - name: Compute distributions
         env:
           PGHOST: ${{ secrets.POSTGRES_HOST }}
           PGPORT: ${{ secrets.POSTGRES_PORT }}
@@ -36,6 +31,6 @@ jobs:
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           PGSSLMODE: require
           NODE_TLS_REJECT_UNAUTHORIZED: 0
-          PROPOSAL_ID: ${{ inputs.proposal_id }}
-          TOTAL_REWARD: ${{ inputs.total_reward }}
-        run: npm run voter-root
+          RUN_DATES: ${{ inputs.run_dates }}
+          OVERWRITE: ${{ inputs.overwrite }}
+        run: npm run compute-distributions

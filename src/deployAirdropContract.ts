@@ -1,15 +1,15 @@
 import { Account, RpcProvider } from "starknet";
-import initializeClient from "./initializeClient.js";
+import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
 
 const dropId = process.env.DROP_ID;
 
 if (!dropId) throw new Error("Missing drop ID");
-const client = await initializeClient();
+const client = await initializeIncentivesClient();
 const { rows } = await client.query<{ root: string }>({
   text: `SELECT root
-         FROM generated_drop
+         FROM incentives.generated_drop
          WHERE id = $1
-           AND id NOT IN (SELECT drop_id FROM deployed_airdrop_contracts)`,
+           AND id NOT IN (SELECT drop_id FROM incentives.deployed_airdrop_contracts)`,
   values: [BigInt(dropId)],
 });
 if (rows.length !== 1) {
@@ -45,7 +45,7 @@ console.log(deployResponse.contract_address);
 
 await client.query({
   text: `
-      INSERT INTO deployed_airdrop_contracts (address, token, drop_id)
+      INSERT INTO incentives.deployed_airdrop_contracts (address, token, drop_id)
       VALUES ($1, $2, $3);
   `,
   values: [
