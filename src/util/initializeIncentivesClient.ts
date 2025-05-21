@@ -89,6 +89,12 @@ export default async function initializeIncentivesClient() {
       PRIMARY KEY (campaign_reward_period_id, locker, salt)
     );
 
+    CREATE INDEX IF NOT EXISTS idx_computed_rewards_salt
+      ON incentives.computed_rewards (salt);
+
+    CREATE INDEX IF NOT EXISTS idx_computed_rewards_locker_salt
+      ON incentives.computed_rewards (locker, salt);
+
     CREATE TABLE IF NOT EXISTS incentives.generated_drop
     (
       id           SERIAL8 PRIMARY KEY,
