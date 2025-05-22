@@ -9,12 +9,23 @@ on:
         required: false
         description: "Comma delimited list of period IDs to be recomputed"
         type: string
+      database:
+        default: "mainnet"
+        required: true
+        description: "Which database to run on"
+        type: choice
+        options:
+          - "eth_sepolia"
+          - "sepolia"
+          - "eth_mainnet"
+          - "mainnet"
 
 concurrency: distributions
 
 jobs:
   run:
     strategy:
+      fail-fast: false
       matrix:
         database:
           - "eth_sepolia"
@@ -24,6 +35,7 @@ jobs:
 
     runs-on: ubuntu-latest
     name: Run
+    if: ${{ inputs.database == null || matrix.database == inputs.database }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
