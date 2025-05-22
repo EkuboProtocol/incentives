@@ -10,7 +10,7 @@ on:
         description: "Comma delimited list of period IDs to be recomputed"
         type: string
       database:
-        default: "mainnet"
+        default: "all"
         required: true
         description: "Which database to run on"
         type: choice
@@ -19,6 +19,7 @@ on:
           - "sepolia"
           - "eth_mainnet"
           - "mainnet"
+          - "all"
 
 concurrency: distributions
 
@@ -45,10 +46,10 @@ jobs:
           cache: "npm"
 
       - run: npm install
-        if: ${{ inputs.database == null || matrix.database == inputs.database }}
+        if: ${{ inputs.database == null || matrix.database == 'all' || matrix.database == inputs.database }}
 
       - run: npm run compute-distributions
-        if: ${{ inputs.database == null || matrix.database == inputs.database }}
+        if: ${{ inputs.database == null || matrix.database == 'all' || matrix.database == inputs.database }}
         env:
           PGHOST: ${{ secrets.POSTGRES_HOST }}
           PGPORT: ${{ secrets.POSTGRES_PORT }}
