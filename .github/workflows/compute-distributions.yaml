@@ -35,7 +35,6 @@ jobs:
 
     runs-on: ubuntu-latest
     name: Run
-    if: ${{ inputs.database == null || matrix.database == inputs.database }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,8 +45,10 @@ jobs:
           cache: "npm"
 
       - run: npm install
+        if: ${{ inputs.database == null || matrix.database == inputs.database }}
 
-      - name: Compute distributions
+      - run: npm run compute-distributions
+        if: ${{ inputs.database == null || matrix.database == inputs.database }}
         env:
           PGHOST: ${{ secrets.POSTGRES_HOST }}
           PGPORT: ${{ secrets.POSTGRES_PORT }}
@@ -57,4 +58,3 @@ jobs:
           PGSSLMODE: require
           NODE_TLS_REJECT_UNAUTHORIZED: 0
           REWARD_PERIODS: ${{ inputs.reward_periods }}
-        run: npm run compute-distributions
