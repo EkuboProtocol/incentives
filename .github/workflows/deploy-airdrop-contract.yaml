@@ -32,7 +32,8 @@ jobs:
         env:
           PGHOST: ${{ secrets.POSTGRES_HOST }}
           PGPORT: ${{ secrets.POSTGRES_PORT }}
-          PGDATABASE: ${{ secrets.POSTGRES_DB }}
+          # this only runs on the starknet mainnet database
+          PGDATABASE: mainnet
           PGUSER: ${{ secrets.POSTGRES_USERNAME }}
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           PGSSLMODE: require
