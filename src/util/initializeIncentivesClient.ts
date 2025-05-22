@@ -7,133 +7,190 @@ export default async function initializeIncentivesClient() {
 
   // language=PostgreSQL
   await client.query(`
-    CREATE SCHEMA IF NOT EXISTS incentives;
+      CREATE SCHEMA IF NOT EXISTS incentives;
 
-    CREATE TABLE IF NOT EXISTS incentives.stddevs_table
-    (
-      id   SERIAL  NOT NULL,
-      name VARCHAR NOT NULL,
-      PRIMARY KEY (id)
-    );
+      CREATE OR REPLACE FUNCTION incentives.percent_within_std(z DOUBLE PRECISION)
+          RETURNS DOUBLE PRECISION
+          LANGUAGE sql
+          IMMUTABLE
+          STRICT
+      AS
+      $$
+      SELECT (1.0 - erfc(ABS($1) / SQRT(2.0)));
+      $$;
 
-    CREATE TABLE IF NOT EXISTS incentives.stddevs_table_entries
-    (
-      stddevs_table_id INT   NOT NULL REFERENCES incentives.stddevs_table (id) ON DELETE CASCADE,
-      multiple         FLOAT NOT NULL,
-      weight           FLOAT NOT NULL
-    );
+      -- Approximate inverse error function via Winitzki’s approximation + Newton-Raphson
+      CREATE OR REPLACE FUNCTION incentives.erfinv(y DOUBLE PRECISION)
+          RETURNS DOUBLE PRECISION
+          LANGUAGE plpgsql
+          IMMUTABLE
+          STRICT
+      AS
+      $$
+      DECLARE
+          a CONSTANT DOUBLE PRECISION := 0.147;
+          s          INTEGER          := CASE WHEN y < 0 THEN -1 ELSE 1 END;
+          ln1y2      DOUBLE PRECISION := LN(1 - y * y);
+          term1      DOUBLE PRECISION := (2 / (PI() * a)) + (ln1y2 / 2);
+          x0         DOUBLE PRECISION := s * SQRT(SQRT(term1 * term1 - (ln1y2 / a)) - term1);
+          i          INTEGER;
+      BEGIN
+          -- refine with 3 Newton-Raphson steps
+          FOR i IN 1..3
+              LOOP
+                  x0 := x0 - (erf(x0) - y) / ((2 / SQRT(PI())) * EXP(-x0 * x0));
+              END LOOP;
+          RETURN x0;
+      END;
+      $$;
 
-    CREATE TABLE IF NOT EXISTS incentives.campaigns
-    (
-      id               SERIAL8     NOT NULL,
-      -- when the campaign is expected to start
-      start_time       timestamptz NOT NULL,
-      -- when campaign will end, if it is known
-      end_time         timestamptz,
-      -- the name of the campaign
-      name             TEXT        NOT NULL,
 
-      slug             VARCHAR(20) NOT NULL,
-      -- the token that is being used for rewards
-      reward_token     NUMERIC     NOT NULL,
-      -- the amount available for rewards
-      budget           NUMERIC     NOT NULL,
-      -- the weights used for incentive calculations
-      stddevs_table_id INT         NOT NULL REFERENCES incentives.stddevs_table,
-      PRIMARY KEY (id)
-    );
+      -- Requires erfinv(y) to be defined (e.g. as in the previous example).
+      -- Returns an array of z‐multiples [z₁, z₂, …] such that
+      -- P(|X| ≤ zₖ) = k * percent_step (capped at max_coverage).
+      CREATE OR REPLACE FUNCTION incentives.linear_percent_std_multiples(
+          percent_step DOUBLE PRECISION, -- e.g. 0.03 for 3% increments
+          max_coverage DOUBLE PRECISION -- e.g. 0.99 for 99% max
+      ) RETURNS DOUBLE PRECISION[]
+          LANGUAGE plpgsql
+          IMMUTABLE
+          STRICT
+      AS
+      $$
+      DECLARE
+          steps   INTEGER            := CEIL(max_coverage / percent_step);
+          out_arr DOUBLE PRECISION[] := ARRAY []::DOUBLE PRECISION[];
+          k       INTEGER;
+          cov     DOUBLE PRECISION;
+      BEGIN
+          IF percent_step <= 0 OR max_coverage <= 0 OR max_coverage > 1 THEN
+              RAISE EXCEPTION 'percent_step must be >0 and max_coverage in (0,1]';
+          END IF;
 
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_incentive_campaigns_slug ON incentives.campaigns (slug);
+          FOR k IN 1..steps
+              LOOP
+                  cov := LEAST(k * percent_step, max_coverage);
+                  out_arr := out_arr || (SQRT(2) * incentives.erfinv(cov));
+                  EXIT WHEN cov >= max_coverage;
+              END LOOP;
 
-    CREATE TABLE IF NOT EXISTS incentives.campaigns_allowed_extension
-    (
-      campaign_id INT REFERENCES incentives.campaigns (id) ON DELETE CASCADE,
-      extension   NUMERIC NOT NULL,
-      PRIMARY KEY (campaign_id, extension)
-    );
+          RETURN out_arr;
+      END;
+      $$;
 
-    -- specific dates on which rewards are provided to pairs
-    CREATE TABLE IF NOT EXISTS incentives.campaign_reward_periods
-    (
-      campaign_id              INT REFERENCES incentives.campaigns (id) ON DELETE CASCADE,
+      CREATE TABLE IF NOT EXISTS incentives.campaigns
+      (
+          id           SERIAL8     NOT NULL,
+          -- when the campaign is expected to start
+          start_time   timestamptz NOT NULL,
+          -- when campaign will end, if it is known
+          end_time     timestamptz,
+          -- the name of the campaign
+          name         TEXT        NOT NULL,
 
-      id                       SERIAL8,
-      -- token pair being incentivized
-      token0                   NUMERIC     NOT NULL,
-      token1                   NUMERIC     NOT NULL,
-      -- the start of the rewards period
-      start_time               timestamptz NOT NULL,
-      -- the end of the rewards period
-      end_time                 timestamptz NOT NULL,
+          slug         VARCHAR(20) NOT NULL,
+          -- the token that is being used for rewards
+          reward_token NUMERIC     NOT NULL,
+          -- the amount available for rewards
+          budget       NUMERIC     NOT NULL,
+          PRIMARY KEY (id)
+      );
 
-      -- the realized volatility to use for computing rewards
-      realized_volatility      float8      NOT NULL,
-      -- the amount that is being distributed for the period
-      token0_reward_amount     NUMERIC     NOT NULL,
-      token1_reward_amount     NUMERIC     NOT NULL,
-      -- when the rewards were last computed for this period, or null if they haven't been computed yet
-      rewards_last_computed_at timestamptz,
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_incentive_campaigns_slug ON incentives.campaigns (slug);
 
-      PRIMARY KEY (id)
-    );
+      CREATE TABLE IF NOT EXISTS incentives.campaigns_allowed_extension
+      (
+          campaign_id INT REFERENCES incentives.campaigns (id) ON DELETE CASCADE,
+          extension   NUMERIC NOT NULL,
+          PRIMARY KEY (campaign_id, extension)
+      );
 
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_reward_periods_pair_period
-      ON incentives.campaign_reward_periods (token0, token1, start_time, end_time);
+      -- specific dates on which rewards are provided to pairs
+      CREATE TABLE IF NOT EXISTS incentives.campaign_reward_periods
+      (
+          campaign_id              INT REFERENCES incentives.campaigns (id) ON DELETE CASCADE,
 
-    CREATE TABLE IF NOT EXISTS incentives.computed_rewards
-    (
-      campaign_reward_period_id int8    NOT NULL REFERENCES incentives.campaign_reward_periods (id),
-      locker                    NUMERIC NOT NULL,
-      salt                      NUMERIC NOT NULL,
-      reward_amount             NUMERIC NOT NULL,
-      PRIMARY KEY (campaign_reward_period_id, locker, salt)
-    );
+          id                       SERIAL8,
+          -- token pair being incentivized
+          token0                   NUMERIC     NOT NULL,
+          token1                   NUMERIC     NOT NULL,
+          -- the start of the rewards period
+          start_time               timestamptz NOT NULL,
+          -- the end of the rewards period
+          end_time                 timestamptz NOT NULL,
 
-    CREATE INDEX IF NOT EXISTS idx_computed_rewards_salt
-      ON incentives.computed_rewards (salt);
+          -- the realized volatility to use for computing rewards
+          realized_volatility      float8      NOT NULL,
+          -- the amount that is being distributed for the period
+          token0_reward_amount     NUMERIC     NOT NULL,
+          token1_reward_amount     NUMERIC     NOT NULL,
+          -- when the rewards were last computed for this period, or null if they haven't been computed yet
+          rewards_last_computed_at timestamptz,
 
-    CREATE INDEX IF NOT EXISTS idx_computed_rewards_locker_salt
-      ON incentives.computed_rewards (locker, salt);
+          -- parameters for the generation of the stddev table
+          percent_step             DOUBLE PRECISION NOT NULL,
+          max_coverage             DOUBLE PRECISION NOT NULL,
 
-    CREATE TABLE IF NOT EXISTS incentives.generated_drop
-    (
-      id           SERIAL8 PRIMARY KEY,
-      root         NUMERIC NOT NULL,
-      generated_at timestamptz DEFAULT CURRENT_TIMESTAMP
-    );
+          PRIMARY KEY (id)
+      );
 
-    -- the periods that were included in the generated merkle root
-    CREATE TABLE IF NOT EXISTS incentives.generated_drop_reward_periods
-    (
-      drop_id                   int8 NOT NULL REFERENCES incentives.generated_drop (id) ON DELETE CASCADE,
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_reward_periods_pair_period
+          ON incentives.campaign_reward_periods (token0, token1, start_time, end_time);
 
-      -- this should not cascade, because it means the source of the data is being deleted
-      campaign_reward_period_id int8 NOT NULL REFERENCES incentives.campaign_reward_periods (id),
+      CREATE TABLE IF NOT EXISTS incentives.computed_rewards
+      (
+          campaign_reward_period_id int8    NOT NULL REFERENCES incentives.campaign_reward_periods (id),
+          locker                    NUMERIC NOT NULL,
+          salt                      NUMERIC NOT NULL,
+          reward_amount             NUMERIC NOT NULL,
+          PRIMARY KEY (campaign_reward_period_id, locker, salt)
+      );
 
-      PRIMARY KEY (drop_id, campaign_reward_period_id)
-    );
+      CREATE INDEX IF NOT EXISTS idx_computed_rewards_salt
+          ON incentives.computed_rewards (salt);
 
-    CREATE TABLE IF NOT EXISTS incentives.generated_drop_proof
-    (
-      drop_id INT REFERENCES incentives.generated_drop (id) ON DELETE CASCADE,
-      id      INT       NOT NULL,
-      address NUMERIC   NOT NULL,
-      amount  NUMERIC   NOT NULL,
-      proof   NUMERIC[] NOT NULL,
-      PRIMARY KEY (drop_id, id)
-    );
+      CREATE INDEX IF NOT EXISTS idx_computed_rewards_locker_salt
+          ON incentives.computed_rewards (locker, salt);
 
-    -- meant to be manually populated
-    CREATE TABLE IF NOT EXISTS incentives.deployed_airdrop_contracts
-    (
-      address NUMERIC NOT NULL PRIMARY KEY,
-      token   NUMERIC NOT NULL,
-      drop_id INT REFERENCES incentives.generated_drop (id) ON DELETE CASCADE
-    );
+      CREATE TABLE IF NOT EXISTS incentives.generated_drop
+      (
+          id           SERIAL8 PRIMARY KEY,
+          root         NUMERIC NOT NULL,
+          generated_at timestamptz DEFAULT CURRENT_TIMESTAMP
+      );
 
-    -- this prevents us from deploying the same drop multiple times
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_deployed_airdrop_contracts_drop_id
-      ON incentives.deployed_airdrop_contracts (drop_id);
+      -- the periods that were included in the generated merkle root
+      CREATE TABLE IF NOT EXISTS incentives.generated_drop_reward_periods
+      (
+          drop_id                   int8 NOT NULL REFERENCES incentives.generated_drop (id) ON DELETE CASCADE,
+
+          -- this should not cascade, because it means the source of the data is being deleted
+          campaign_reward_period_id int8 NOT NULL REFERENCES incentives.campaign_reward_periods (id),
+
+          PRIMARY KEY (drop_id, campaign_reward_period_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS incentives.generated_drop_proof
+      (
+          drop_id INT REFERENCES incentives.generated_drop (id) ON DELETE CASCADE,
+          id      INT       NOT NULL,
+          address NUMERIC   NOT NULL,
+          amount  NUMERIC   NOT NULL,
+          proof   NUMERIC[] NOT NULL,
+          PRIMARY KEY (drop_id, id)
+      );
+
+      -- meant to be manually populated
+      CREATE TABLE IF NOT EXISTS incentives.deployed_airdrop_contracts
+      (
+          address NUMERIC NOT NULL PRIMARY KEY,
+          token   NUMERIC NOT NULL,
+          drop_id INT REFERENCES incentives.generated_drop (id) ON DELETE CASCADE
+      );
+
+      -- this prevents us from deploying the same drop multiple times
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_deployed_airdrop_contracts_drop_id
+          ON incentives.deployed_airdrop_contracts (drop_id);
   `);
 
   console.log("Schema initialized");
