@@ -19,8 +19,8 @@ export async function generateAndInsertDrop(
   options: GenerateAndInsertDropOptions,
 ): Promise<number> {
   const claimsWithHashes: { claim: Claim; hash: bigint }[] = allocations
-    .map((c, ix): Claim => ({ id: ix, ...c }))
-    .map((claim, ix) => ({
+    .map((allocation, ix): Claim => ({ id: ix, ...allocation }))
+    .map((claim) => ({
       claim,
       hash: options.claimHashFunction(claim),
     }));
