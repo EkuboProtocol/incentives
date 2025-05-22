@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "0 */1 * * *"
   workflow_dispatch:
+    inputs:
+      reward_periods:
+        required: false
+        description: "Comma delimited list of period IDs to be recomputed"
+        type: string
 
 concurrency: distributions
 
@@ -39,6 +44,5 @@ jobs:
           PGDATABASE: ${{ matrix.database }}
           PGSSLMODE: require
           NODE_TLS_REJECT_UNAUTHORIZED: 0
-          RUN_DATES: ${{ inputs.run_dates }}
-          OVERWRITE: ${{ inputs.overwrite }}
+          REWARD_PERIODS: ${{ inputs.reward_periods }}
         run: npm run compute-distributions
