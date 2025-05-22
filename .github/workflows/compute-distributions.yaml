@@ -46,10 +46,10 @@ jobs:
           cache: "npm"
 
       - run: npm install
-        if: ${{ inputs.database == null || matrix.database == 'all' || matrix.database == inputs.database }}
+        if: ${{ inputs.database == null || inputs.database == 'all' || matrix.database == inputs.database }}
 
       - run: npm run compute-distributions
-        if: ${{ inputs.database == null || matrix.database == 'all' || matrix.database == inputs.database }}
+        if: ${{ inputs.database == null || inputs.database == 'all' || matrix.database == inputs.database }}
         env:
           PGHOST: ${{ secrets.POSTGRES_HOST }}
           PGPORT: ${{ secrets.POSTGRES_PORT }}
