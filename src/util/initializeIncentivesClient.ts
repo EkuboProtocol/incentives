@@ -245,16 +245,9 @@ export default async function initializeIncentivesClient() {
 
           -- insert campaign
           INSERT INTO incentives.campaigns
-              (name, slug, start_time, end_time, reward_token, budget)
-          VALUES (p_name, p_slug, p_start_time, p_end_time, p_reward_token, v_total_budget)
+              (name, slug, start_time, end_time, reward_token, budget, allowed_extensions)
+          VALUES (p_name, p_slug, p_start_time, p_end_time, p_reward_token, v_total_budget, p_allowed_extensions)
           RETURNING id INTO v_campaign_id;
-
-          -- insert allowed extensions
-          FOREACH v_ext IN ARRAY p_allowed_extensions
-              LOOP
-                  INSERT INTO incentives.campaigns_allowed_extension(campaign_id, extension)
-                  VALUES (v_campaign_id, v_ext);
-              END LOOP;
 
           -- compute number of full intervals
           v_periods := CEIL(
