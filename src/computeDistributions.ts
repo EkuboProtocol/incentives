@@ -19,7 +19,7 @@ try {
               ORDER BY end_time
               LIMIT $1
           `,
-          values: [20],
+          values: [500],
         })
       ).rows.map(({ id }) => id);
 
