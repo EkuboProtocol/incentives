@@ -79,39 +79,44 @@ export default async function initializeIncentivesClient() {
       $$;
 
 
-      DO $$ BEGIN
-          CREATE TYPE incentives.locker_salt_pair AS
-          (
-              locker NUMERIC,
-              salt   NUMERIC
-          );
-      EXCEPTION
-          WHEN duplicate_object THEN NULL;
-      END $$;
+      DO
+      $$
+          BEGIN
+              CREATE TYPE incentives.locker_salt_pair AS
+              (
+                  locker NUMERIC,
+                  salt   NUMERIC
+              );
+          EXCEPTION
+              WHEN duplicate_object THEN NULL;
+          END
+      $$;
 
       CREATE TABLE IF NOT EXISTS incentives.campaigns
       (
-          id                    SERIAL8          NOT NULL,
+          id                      SERIAL8          NOT NULL,
           -- when the campaign is expected to start
-          start_time            timestamptz      NOT NULL,
+          start_time              timestamptz      NOT NULL,
           -- when campaign will end, if it is known
-          end_time              timestamptz,
+          end_time                timestamptz,
           -- the name of the campaign
-          name                  TEXT             NOT NULL,
+          name                    TEXT             NOT NULL,
 
-          slug                  VARCHAR(20)      NOT NULL,
+          slug                    VARCHAR(20)      NOT NULL,
           -- the token that is being used for rewards
-          reward_token          NUMERIC          NOT NULL,
+          reward_token            NUMERIC          NOT NULL,
           -- the amount available for rewards
-          budget                NUMERIC          NOT NULL,
+          budget                  NUMERIC          NOT NULL,
           -- the extensions that can be incentivized
-          allowed_extensions    NUMERIC[]                     DEFAULT '{0}' NOT NULL,
+          allowed_extensions      NUMERIC[]                     DEFAULT '{0}' NOT NULL,
           -- the default percent step for the campaign
-          default_percent_step  DOUBLE PRECISION NOT NULL     DEFAULT 0.025,
+          default_percent_step    DOUBLE PRECISION NOT NULL     DEFAULT 0.025,
           -- the default max coverage for the campaign
-          default_max_coverage  DOUBLE PRECISION NOT NULL     DEFAULT 0.9975,
+          default_max_coverage    DOUBLE PRECISION NOT NULL     DEFAULT 0.9975,
+          -- the default max coverage for the campaign
+          default_fee_denominator NUMERIC          NOT NULL,
           -- locker,salt combos that are excluded from computations
-          excluded_locker_salts incentives.locker_salt_pair[] DEFAULT '{}' NOT NULL,
+          excluded_locker_salts   incentives.locker_salt_pair[] DEFAULT '{}' NOT NULL,
           PRIMARY KEY (id)
       );
 
@@ -142,6 +147,7 @@ export default async function initializeIncentivesClient() {
           -- parameters for the generation of the stddev table
           percent_step             DOUBLE PRECISION,
           max_coverage             DOUBLE PRECISION,
+          fee_denominator          NUMERIC,
 
           PRIMARY KEY (id)
       );

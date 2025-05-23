@@ -50,6 +50,7 @@ try {
                                        crp.token1_reward_amount,
                                        c.allowed_extensions,
                                        c.excluded_locker_salts,
+                                       COALESCE(crp.fee_denominator, c.default_fee_denominator)            AS fee_denominator,
                                        COALESCE(crp.max_coverage, c.default_max_coverage)                  AS max_coverage,
                                        COALESCE(crp.percent_step, c.default_percent_step)                  AS percent_step,
                                        ROUND(LOG(EXP(realized_volatility)) / LOG(1.000001))::INT           AS volatility_in_ticks,
@@ -84,10 +85,11 @@ try {
 
 
                 -- the weights corresponding to each multiple of the standard deviation
-                stddev_multiple_weights AS (SELECT multiple,
+                stddev_multiple_weights AS (SELECT ROW_NUMBER() OVER (ORDER BY multiple)                row_no,
+                                                   GREATEST(CEIL(volatility_in_ticks * multiple), 1) AS tick_weight,
                                                    (incentives.percent_within_std(multiple) - COALESCE(
                                                            LAG(incentives.percent_within_std(multiple))
-                                                           OVER (ORDER BY multiple), 0)) AS weight
+                                                           OVER (ORDER BY multiple), 0))             AS weight
                                             FROM period_info pi,
                                                  UNNEST(incentives.linear_percent_std_multiples(pi.percent_step,
                                                                                                 pi.max_coverage)) AS multiple),
@@ -96,7 +98,7 @@ try {
                 relevant_pool_key_hashes
                   AS (SELECT pk.key_hash,
                              int4(
-                                 LOG(1::NUMERIC + (fee / $2::NUMERIC)) /
+                                 LOG(1::NUMERIC + (fee / fee_denominator)) /
                                  LOG(1.000001::NUMERIC)
                              ) AS mid_distance_in_ticks
                       FROM pool_keys pk
@@ -137,17 +139,18 @@ try {
                       GROUP BY period_start),
 
                 interval_pair_prices AS (SELECT ipp.*,
-                                                LEAD(period_start) OVER (PARTITION BY multiple ORDER BY period_start) AS next_period_start,
+                                                LEAD(period_start)
+                                                OVER (PARTITION BY weights.row_no ORDER BY period_start) AS next_period_start,
                                                 weight,
                                                 INT4RANGE(
-                                                    CEIL(ipp.tick - multiple * volatility_in_ticks)::INT,
-                                                    ipp.tick::INT)                                                       stddev_range_lower,
+                                                    CEIL(ipp.tick - tick_weight)::INT,
+                                                    ipp.tick::INT)                                          stddev_range_lower,
                                                 INT4RANGE(
                                                     ipp.tick::INT,
-                                                    FLOOR(ipp.tick + multiple * volatility_in_ticks)::INT)               stddev_range_upper
+                                                    FLOOR(ipp.tick + tick_weight)::INT)                     stddev_range_upper
                                          FROM interval_pair_prices_without_next_start ipp,
                                               period_info,
-                                              stddev_multiple_weights),
+                                              stddev_multiple_weights weights),
 
                 -- the state of all the positions aggregated at the beginning of the period
                 positions_created_before_start
@@ -357,9 +360,6 @@ try {
       values: [
         // the period
         id,
-        // fee denominator
-        // to increase effect of fee, decrease the denominator, e.g. double effect by halving fee denominator
-        0x0100000000000000000000000000000000n,
       ],
     });
 
