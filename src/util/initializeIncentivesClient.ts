@@ -79,33 +79,37 @@ export default async function initializeIncentivesClient() {
       $$;
 
 
-      CREATE TYPE incentives.locker_salt_pair AS
-      (
-          locker NUMERIC,
-          salt   NUMERIC
-      );
+      DO $$ BEGIN
+          CREATE TYPE incentives.locker_salt_pair AS
+          (
+              locker NUMERIC,
+              salt   NUMERIC
+          );
+      EXCEPTION
+          WHEN duplicate_object THEN NULL;
+      END $$;
 
       CREATE TABLE IF NOT EXISTS incentives.campaigns
       (
-          id                   SERIAL8          NOT NULL,
+          id                    SERIAL8          NOT NULL,
           -- when the campaign is expected to start
-          start_time           timestamptz      NOT NULL,
+          start_time            timestamptz      NOT NULL,
           -- when campaign will end, if it is known
-          end_time             timestamptz,
+          end_time              timestamptz,
           -- the name of the campaign
-          name                 TEXT             NOT NULL,
+          name                  TEXT             NOT NULL,
 
-          slug                 VARCHAR(20)      NOT NULL,
+          slug                  VARCHAR(20)      NOT NULL,
           -- the token that is being used for rewards
-          reward_token         NUMERIC          NOT NULL,
+          reward_token          NUMERIC          NOT NULL,
           -- the amount available for rewards
-          budget               NUMERIC          NOT NULL,
+          budget                NUMERIC          NOT NULL,
           -- the extensions that can be incentivized
-          allowed_extensions   NUMERIC[]                 DEFAULT '{0}' NOT NULL,
+          allowed_extensions    NUMERIC[]                     DEFAULT '{0}' NOT NULL,
           -- the default percent step for the campaign
-          default_percent_step DOUBLE PRECISION NOT NULL DEFAULT 0.025,
+          default_percent_step  DOUBLE PRECISION NOT NULL     DEFAULT 0.025,
           -- the default max coverage for the campaign
-          default_max_coverage DOUBLE PRECISION NOT NULL DEFAULT 0.9975,
+          default_max_coverage  DOUBLE PRECISION NOT NULL     DEFAULT 0.9975,
           -- locker,salt combos that are excluded from computations
           excluded_locker_salts incentives.locker_salt_pair[] DEFAULT '{}' NOT NULL,
           PRIMARY KEY (id)
@@ -120,18 +124,18 @@ export default async function initializeIncentivesClient() {
 
           id                       SERIAL8,
           -- token pair being incentivized
-          token0                   NUMERIC          NOT NULL,
-          token1                   NUMERIC          NOT NULL,
+          token0                   NUMERIC     NOT NULL,
+          token1                   NUMERIC     NOT NULL,
           -- the start of the rewards period
-          start_time               timestamptz      NOT NULL,
+          start_time               timestamptz NOT NULL,
           -- the end of the rewards period
-          end_time                 timestamptz      NOT NULL,
+          end_time                 timestamptz NOT NULL,
 
           -- the realized volatility to use for computing rewards
-          realized_volatility      float8           NOT NULL,
+          realized_volatility      float8      NOT NULL,
           -- the amount that is being distributed for the period
-          token0_reward_amount     NUMERIC          NOT NULL,
-          token1_reward_amount     NUMERIC          NOT NULL,
+          token0_reward_amount     NUMERIC     NOT NULL,
+          token1_reward_amount     NUMERIC     NOT NULL,
           -- when the rewards were last computed for this period, or null if they haven't been computed yet
           rewards_last_computed_at timestamptz,
 
@@ -219,7 +223,8 @@ export default async function initializeIncentivesClient() {
           p_interval INTERVAL,
           p_reward_token NUMERIC,
           p_pairs incentives.token_pair_budget[],
-          p_allowed_extensions NUMERIC[] DEFAULT '{}',
+          p_excluded_locker_salts incentives.locker_salt_pair[],
+          p_allowed_extensions NUMERIC[] DEFAULT '{0}',
           p_percent_step DOUBLE PRECISION DEFAULT 0.025,
           p_max_coverage DOUBLE PRECISION DEFAULT 0.9975
       )
@@ -235,7 +240,6 @@ export default async function initializeIncentivesClient() {
           v_per_period   NUMERIC;
           v_start        timestamptz;
           v_end          timestamptz;
-          v_ext          NUMERIC;
       BEGIN
           -- sum all pair-budgets
           FOREACH v_pair IN ARRAY p_pairs
@@ -245,8 +249,9 @@ export default async function initializeIncentivesClient() {
 
           -- insert campaign
           INSERT INTO incentives.campaigns
-              (name, slug, start_time, end_time, reward_token, budget, allowed_extensions)
-          VALUES (p_name, p_slug, p_start_time, p_end_time, p_reward_token, v_total_budget, p_allowed_extensions)
+          (name, slug, start_time, end_time, reward_token, budget, allowed_extensions, excluded_locker_salts)
+          VALUES (p_name, p_slug, p_start_time, p_end_time, p_reward_token, v_total_budget, p_allowed_extensions,
+                  p_excluded_locker_salts)
           RETURNING id INTO v_campaign_id;
 
           -- compute number of full intervals

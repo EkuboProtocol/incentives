@@ -49,6 +49,7 @@ try {
                                        crp.token0_reward_amount,
                                        crp.token1_reward_amount,
                                        c.allowed_extensions,
+                                       c.excluded_locker_salts,
                                        COALESCE(crp.max_coverage, c.default_max_coverage)                  AS max_coverage,
                                        COALESCE(crp.percent_step, c.default_percent_step)                  AS percent_step,
                                        ROUND(LOG(EXP(realized_volatility)) / LOG(1.000001))::INT           AS volatility_in_ticks,
@@ -268,7 +269,8 @@ try {
                       FROM position_states_during_period psdp
                              JOIN relevant_pool_key_hashes rpkh ON psdp.pool_key_hash = rpkh.key_hash,
                            interval_pair_prices ipp,
-                           period_info p),
+                           period_info p
+                      WHERE (psdp.locker, psdp.salt)::incentives.locker_salt_pair != ANY (p.excluded_locker_salts)),
 
                 position_depth_per_time
                   AS (SELECT pool_key_hash,
