@@ -265,8 +265,8 @@ export default async function initializeIncentivesClient() {
                                    v_pair.token0,       v_pair.token1,
                                    v_start,             v_end,
                                    0,                   -- default realized_volatility
-                                   v_per_period / 2,    -- half to token0
-                                   v_per_period / 2,    -- half to token1
+                                   floor(v_per_period / 2),    -- half to token0
+                                   floor(v_per_period / 2),    -- half to token1
                                    p_percent_step,
                                    p_max_coverage
                                  );
