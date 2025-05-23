@@ -78,32 +78,40 @@ export default async function initializeIncentivesClient() {
       END;
       $$;
 
+
+      CREATE TYPE incentives.locker_salt_pair AS
+      (
+          locker NUMERIC,
+          salt   NUMERIC
+      );
+
       CREATE TABLE IF NOT EXISTS incentives.campaigns
       (
-          id           SERIAL8     NOT NULL,
+          id                   SERIAL8          NOT NULL,
           -- when the campaign is expected to start
-          start_time   timestamptz NOT NULL,
+          start_time           timestamptz      NOT NULL,
           -- when campaign will end, if it is known
-          end_time     timestamptz,
+          end_time             timestamptz,
           -- the name of the campaign
-          name         TEXT        NOT NULL,
+          name                 TEXT             NOT NULL,
 
-          slug         VARCHAR(20) NOT NULL,
+          slug                 VARCHAR(20)      NOT NULL,
           -- the token that is being used for rewards
-          reward_token NUMERIC     NOT NULL,
+          reward_token         NUMERIC          NOT NULL,
           -- the amount available for rewards
-          budget       NUMERIC     NOT NULL,
+          budget               NUMERIC          NOT NULL,
+          -- the extensions that can be incentivized
+          allowed_extensions   NUMERIC[]                 DEFAULT '{0}' NOT NULL,
+          -- the default percent step for the campaign
+          default_percent_step DOUBLE PRECISION NOT NULL DEFAULT 0.025,
+          -- the default max coverage for the campaign
+          default_max_coverage DOUBLE PRECISION NOT NULL DEFAULT 0.9975,
+          -- locker,salt combos that are excluded from computations
+          excluded_locker_salts incentives.locker_salt_pair[] DEFAULT '{}' NOT NULL,
           PRIMARY KEY (id)
       );
 
       CREATE UNIQUE INDEX IF NOT EXISTS idx_incentive_campaigns_slug ON incentives.campaigns (slug);
-
-      CREATE TABLE IF NOT EXISTS incentives.campaigns_allowed_extension
-      (
-          campaign_id INT REFERENCES incentives.campaigns (id) ON DELETE CASCADE,
-          extension   NUMERIC NOT NULL,
-          PRIMARY KEY (campaign_id, extension)
-      );
 
       -- specific dates on which rewards are provided to pairs
       CREATE TABLE IF NOT EXISTS incentives.campaign_reward_periods
@@ -128,8 +136,8 @@ export default async function initializeIncentivesClient() {
           rewards_last_computed_at timestamptz,
 
           -- parameters for the generation of the stddev table
-          percent_step             DOUBLE PRECISION NOT NULL,
-          max_coverage             DOUBLE PRECISION NOT NULL,
+          percent_step             DOUBLE PRECISION,
+          max_coverage             DOUBLE PRECISION,
 
           PRIMARY KEY (id)
       );
