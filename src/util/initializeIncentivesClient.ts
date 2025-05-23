@@ -192,13 +192,14 @@ export default async function initializeIncentivesClient() {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_deployed_airdrop_contracts_drop_id
           ON incentives.deployed_airdrop_contracts (drop_id);
 
-      -- 1. Redefine token_pair to include per-pair budget
+      -- 1. Redefine token_pair to include per-pair budget & realized_volatility
       DROP TYPE IF EXISTS incentives.token_pair_budget CASCADE;
       CREATE TYPE incentives.token_pair_budget AS
       (
-          token0 NUMERIC,
-          token1 NUMERIC,
-          budget NUMERIC
+          token0              NUMERIC,
+          token1              NUMERIC,
+          budget              NUMERIC,
+          realized_volatility DOUBLE PRECISION
       );
 
       -- 2. Function creates campaign + allowed extensions + reward periods
@@ -275,9 +276,9 @@ export default async function initializeIncentivesClient() {
                           VALUES (v_campaign_id,
                                   v_pair.token0, v_pair.token1,
                                   v_start, v_end,
-                                  0, -- default realized_volatility
-                                  FLOOR(v_per_period / 2), -- half to token0
-                                  FLOOR(v_per_period / 2), -- half to token1
+                                  v_pair.realized_volatility,
+                                  FLOOR(v_per_period / 2),
+                                  FLOOR(v_per_period / 2),
                                   p_percent_step,
                                   p_max_coverage);
 
