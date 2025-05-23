@@ -112,18 +112,18 @@ export default async function initializeIncentivesClient() {
 
           id                       SERIAL8,
           -- token pair being incentivized
-          token0                   NUMERIC     NOT NULL,
-          token1                   NUMERIC     NOT NULL,
+          token0                   NUMERIC          NOT NULL,
+          token1                   NUMERIC          NOT NULL,
           -- the start of the rewards period
-          start_time               timestamptz NOT NULL,
+          start_time               timestamptz      NOT NULL,
           -- the end of the rewards period
-          end_time                 timestamptz NOT NULL,
+          end_time                 timestamptz      NOT NULL,
 
           -- the realized volatility to use for computing rewards
-          realized_volatility      float8      NOT NULL,
+          realized_volatility      float8           NOT NULL,
           -- the amount that is being distributed for the period
-          token0_reward_amount     NUMERIC     NOT NULL,
-          token1_reward_amount     NUMERIC     NOT NULL,
+          token0_reward_amount     NUMERIC          NOT NULL,
+          token1_reward_amount     NUMERIC          NOT NULL,
           -- when the rewards were last computed for this period, or null if they haven't been computed yet
           rewards_last_computed_at timestamptz,
 
@@ -192,91 +192,101 @@ export default async function initializeIncentivesClient() {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_deployed_airdrop_contracts_drop_id
           ON incentives.deployed_airdrop_contracts (drop_id);
 
--- 1. Redefine token_pair to include per-pair budget
-      drop type if exists incentives.token_pair_budget cascade;
-      create type incentives.token_pair_budget as (
-                                             token0  numeric,
-                                             token1  numeric,
-                                             budget  numeric
-                                           );
+      -- 1. Redefine token_pair to include per-pair budget
+      DROP TYPE IF EXISTS incentives.token_pair_budget CASCADE;
+      CREATE TYPE incentives.token_pair_budget AS
+      (
+          token0 NUMERIC,
+          token1 NUMERIC,
+          budget NUMERIC
+      );
 
-      -- 2. Function creates campaign + reward periods, with optional percent_step & max_coverage
-      create or replace function incentives.create_campaign(
-        p_name           text,
-        p_slug           varchar(20),
-        p_start_time     timestamptz,
-        p_end_time       timestamptz,
-        p_interval       interval,
-        p_reward_token   numeric,
-        p_pairs          incentives.token_pair_budget[],
-        p_percent_step   double precision default 0.025,
-        p_max_coverage   double precision default 0.9975
+      -- 2. Function creates campaign + allowed extensions + reward periods
+      CREATE OR REPLACE FUNCTION incentives.create_campaign(
+          p_name TEXT,
+          p_slug VARCHAR(20),
+          p_start_time timestamptz,
+          p_end_time timestamptz,
+          p_interval INTERVAL,
+          p_reward_token NUMERIC,
+          p_pairs incentives.token_pair_budget[],
+          p_allowed_extensions NUMERIC[] DEFAULT '{}',
+          p_percent_step DOUBLE PRECISION DEFAULT 0.025,
+          p_max_coverage DOUBLE PRECISION DEFAULT 0.9975
       )
-        returns bigint
-        language plpgsql
-      as $$
-      declare
-        v_campaign_id    bigint;
-        v_total_budget   numeric := 0;
-        v_periods        integer;
-        v_pair           incentives.token_pair_budget;
-        v_per_period     numeric;
-        v_start          timestamptz;
-        v_end            timestamptz;
-      begin
-        -- sum all pair-budgets
-        foreach v_pair in array p_pairs loop
-                v_total_budget := v_total_budget + v_pair.budget;
-          end loop;
+          RETURNS BIGINT
+          LANGUAGE plpgsql
+      AS
+      $$
+      DECLARE
+          v_campaign_id  BIGINT;
+          v_total_budget NUMERIC := 0;
+          v_periods      INTEGER;
+          v_pair         incentives.token_pair_budget;
+          v_per_period   NUMERIC;
+          v_start        timestamptz;
+          v_end          timestamptz;
+          v_ext          NUMERIC;
+      BEGIN
+          -- sum all pair-budgets
+          FOREACH v_pair IN ARRAY p_pairs
+              LOOP
+                  v_total_budget := v_total_budget + v_pair.budget;
+              END LOOP;
 
-        -- insert campaign
-        insert into incentives.campaigns
-          (name, slug, start_time, end_time, reward_token, budget)
-        values
-          (p_name, p_slug, p_start_time, p_end_time, p_reward_token, v_total_budget)
-        returning id into v_campaign_id;
+          -- insert campaign
+          INSERT INTO incentives.campaigns
+              (name, slug, start_time, end_time, reward_token, budget)
+          VALUES (p_name, p_slug, p_start_time, p_end_time, p_reward_token, v_total_budget)
+          RETURNING id INTO v_campaign_id;
 
-        -- compute number of full intervals
-        v_periods := ceil(
-            extract(epoch from (p_end_time - p_start_time))
-              /
-            extract(epoch from p_interval)
-                     )::int;
+          -- insert allowed extensions
+          FOREACH v_ext IN ARRAY p_allowed_extensions
+              LOOP
+                  INSERT INTO incentives.campaigns_allowed_extension(campaign_id, extension)
+                  VALUES (v_campaign_id, v_ext);
+              END LOOP;
 
-        -- for each pair, split its budget evenly over intervals & tokens
-        foreach v_pair in array p_pairs loop
-                v_per_period := v_pair.budget / v_periods;
-                v_start := p_start_time;
+          -- compute number of full intervals
+          v_periods := CEIL(
+                  EXTRACT(EPOCH FROM (p_end_time - p_start_time))
+                      /
+                  EXTRACT(EPOCH FROM p_interval)
+                       )::INT;
 
-                for _ in 1..v_periods loop
-                        v_end := least(v_start + p_interval, p_end_time);
+          -- for each pair, split its budget evenly over intervals & tokens
+          FOREACH v_pair IN ARRAY p_pairs
+              LOOP
+                  v_per_period := v_pair.budget / v_periods;
+                  v_start := p_start_time;
 
-                        insert into incentives.campaign_reward_periods (
-                          campaign_id,
-                          token0, token1,
-                          start_time, end_time,
-                          realized_volatility,
-                          token0_reward_amount,
-                          token1_reward_amount,
-                          percent_step,
-                          max_coverage
-                        ) values (
-                                   v_campaign_id,
-                                   v_pair.token0,       v_pair.token1,
-                                   v_start,             v_end,
-                                   0,                   -- default realized_volatility
-                                   floor(v_per_period / 2),    -- half to token0
-                                   floor(v_per_period / 2),    -- half to token1
-                                   p_percent_step,
-                                   p_max_coverage
-                                 );
+                  FOR _ IN 1..v_periods
+                      LOOP
+                          v_end := LEAST(v_start + p_interval, p_end_time);
 
-                        v_start := v_start + p_interval;
-                  end loop;
-          end loop;
+                          INSERT INTO incentives.campaign_reward_periods (campaign_id,
+                                                                          token0, token1,
+                                                                          start_time, end_time,
+                                                                          realized_volatility,
+                                                                          token0_reward_amount,
+                                                                          token1_reward_amount,
+                                                                          percent_step,
+                                                                          max_coverage)
+                          VALUES (v_campaign_id,
+                                  v_pair.token0, v_pair.token1,
+                                  v_start, v_end,
+                                  0, -- default realized_volatility
+                                  FLOOR(v_per_period / 2), -- half to token0
+                                  FLOOR(v_per_period / 2), -- half to token1
+                                  p_percent_step,
+                                  p_max_coverage);
 
-        return v_campaign_id;
-      end;
+                          v_start := v_start + p_interval;
+                      END LOOP;
+              END LOOP;
+
+          RETURN v_campaign_id;
+      END;
       $$;
   `);
 
