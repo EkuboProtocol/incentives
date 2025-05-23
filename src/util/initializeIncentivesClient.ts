@@ -191,6 +191,93 @@ export default async function initializeIncentivesClient() {
       -- this prevents us from deploying the same drop multiple times
       CREATE UNIQUE INDEX IF NOT EXISTS idx_deployed_airdrop_contracts_drop_id
           ON incentives.deployed_airdrop_contracts (drop_id);
+
+-- 1. Redefine token_pair to include per-pair budget
+      drop type if exists incentives.token_pair_budget cascade;
+      create type incentives.token_pair_budget as (
+                                             token0  numeric,
+                                             token1  numeric,
+                                             budget  numeric
+                                           );
+
+      -- 2. Function creates campaign + reward periods, with optional percent_step & max_coverage
+      create or replace function incentives.create_campaign(
+        p_name           text,
+        p_slug           varchar(20),
+        p_start_time     timestamptz,
+        p_end_time       timestamptz,
+        p_interval       interval,
+        p_reward_token   numeric,
+        p_pairs          incentives.token_pair_budget[],
+        p_percent_step   double precision default 0.025,
+        p_max_coverage   double precision default 0.9975
+      )
+        returns bigint
+        language plpgsql
+      as $$
+      declare
+        v_campaign_id    bigint;
+        v_total_budget   numeric := 0;
+        v_periods        integer;
+        v_pair           incentives.token_pair_budget;
+        v_per_period     numeric;
+        v_start          timestamptz;
+        v_end            timestamptz;
+      begin
+        -- sum all pair-budgets
+        foreach v_pair in array p_pairs loop
+                v_total_budget := v_total_budget + v_pair.budget;
+          end loop;
+
+        -- insert campaign
+        insert into incentives.campaigns
+          (name, slug, start_time, end_time, reward_token, budget)
+        values
+          (p_name, p_slug, p_start_time, p_end_time, p_reward_token, v_total_budget)
+        returning id into v_campaign_id;
+
+        -- compute number of full intervals
+        v_periods := ceil(
+            extract(epoch from (p_end_time - p_start_time))
+              /
+            extract(epoch from p_interval)
+                     )::int;
+
+        -- for each pair, split its budget evenly over intervals & tokens
+        foreach v_pair in array p_pairs loop
+                v_per_period := v_pair.budget / v_periods;
+                v_start := p_start_time;
+
+                for _ in 1..v_periods loop
+                        v_end := least(v_start + p_interval, p_end_time);
+
+                        insert into incentives.campaign_reward_periods (
+                          campaign_id,
+                          token0, token1,
+                          start_time, end_time,
+                          realized_volatility,
+                          token0_reward_amount,
+                          token1_reward_amount,
+                          percent_step,
+                          max_coverage
+                        ) values (
+                                   v_campaign_id,
+                                   v_pair.token0,       v_pair.token1,
+                                   v_start,             v_end,
+                                   0,                   -- default realized_volatility
+                                   v_per_period / 2,    -- half to token0
+                                   v_per_period / 2,    -- half to token1
+                                   p_percent_step,
+                                   p_max_coverage
+                                 );
+
+                        v_start := v_start + p_interval;
+                  end loop;
+          end loop;
+
+        return v_campaign_id;
+      end;
+      $$;
   `);
 
   console.log("Schema initialized");
