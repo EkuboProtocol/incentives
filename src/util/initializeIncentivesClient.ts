@@ -229,10 +229,11 @@ export default async function initializeIncentivesClient() {
           p_interval INTERVAL,
           p_reward_token NUMERIC,
           p_pairs incentives.token_pair_budget[],
+          p_default_fee_denominator NUMERIC,
           p_allowed_extensions NUMERIC[] DEFAULT '{0}',
           p_excluded_locker_salts incentives.locker_salt_pair[] DEFAULT '{}',
-          p_percent_step DOUBLE PRECISION DEFAULT 0.025,
-          p_max_coverage DOUBLE PRECISION DEFAULT 0.9975
+          p_percent_step DOUBLE PRECISION DEFAULT NULL,
+          p_max_coverage DOUBLE PRECISION DEFAULT NULL
       )
           RETURNS BIGINT
           LANGUAGE plpgsql
@@ -255,9 +256,10 @@ export default async function initializeIncentivesClient() {
 
           -- insert campaign
           INSERT INTO incentives.campaigns
-          (name, slug, start_time, end_time, reward_token, budget, allowed_extensions, excluded_locker_salts)
+          (name, slug, start_time, end_time, reward_token, budget, allowed_extensions, excluded_locker_salts,
+           default_fee_denominator)
           VALUES (p_name, p_slug, p_start_time, p_end_time, p_reward_token, v_total_budget, p_allowed_extensions,
-                  p_excluded_locker_salts)
+                  p_excluded_locker_salts, p_default_fee_denominator)
           RETURNING id INTO v_campaign_id;
 
           -- compute number of full intervals
