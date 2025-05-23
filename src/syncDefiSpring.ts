@@ -93,14 +93,11 @@ try {
     throw new Error(`Campaign with slug ${campaignSlug} not found`);
   }
 
-  const PERCENT_STEP = 0.03;
-  const MAX_COVERAGE = 0.997;
-
   const { rowCount } = await client.query({
     text: `
         INSERT INTO incentives.campaign_reward_periods (campaign_id, token0, token1, start_time, end_time,
                                                         realized_volatility, token0_reward_amount,
-                                                        token1_reward_amount, percent_step, max_coverage)
+                                                        token1_reward_amount)
         VALUES
         ${incentiveRewardPeriodRowData
           .map(
@@ -113,7 +110,7 @@ try {
               token0RewardAmount,
               token1RewardAmount,
             }) =>
-              `(${campaign.id}, ${token0}, ${token1}, '${startDate.toISOString()}', '${endDate.toISOString()}', ${realizedVolatility}, ${token0RewardAmount}, ${token1RewardAmount}, ${PERCENT_STEP}, ${MAX_COVERAGE})`,
+              `(${campaign.id}, ${token0}, ${token1}, '${startDate.toISOString()}', '${endDate.toISOString()}', ${realizedVolatility}, ${token0RewardAmount}, ${token1RewardAmount})`,
           )
           .join(",\n")}
             ON CONFLICT
