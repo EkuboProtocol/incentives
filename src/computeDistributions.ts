@@ -270,7 +270,7 @@ try {
                              JOIN relevant_pool_key_hashes rpkh ON psdp.pool_key_hash = rpkh.key_hash,
                            interval_pair_prices ipp,
                            period_info p
-                      WHERE (psdp.locker, psdp.salt)::incentives.locker_salt_pair != ANY (p.excluded_locker_salts)),
+                      WHERE (psdp.locker, psdp.salt)::incentives.locker_salt_pair <> ALL (p.excluded_locker_salts)),
 
                 position_depth_per_time
                   AS (SELECT pool_key_hash,
