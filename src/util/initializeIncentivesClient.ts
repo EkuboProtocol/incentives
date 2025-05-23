@@ -223,8 +223,8 @@ export default async function initializeIncentivesClient() {
           p_interval INTERVAL,
           p_reward_token NUMERIC,
           p_pairs incentives.token_pair_budget[],
-          p_excluded_locker_salts incentives.locker_salt_pair[],
           p_allowed_extensions NUMERIC[] DEFAULT '{0}',
+          p_excluded_locker_salts incentives.locker_salt_pair[] DEFAULT '{}',
           p_percent_step DOUBLE PRECISION DEFAULT 0.025,
           p_max_coverage DOUBLE PRECISION DEFAULT 0.9975
       )
