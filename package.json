@@ -4,8 +4,9 @@
   "scripts": {
     "sync-defi-spring": "tsx src/syncDefiSpring.ts",
     "compute-distributions": "tsx src/computeDistributions.ts",
-    "create-root": "tsx src/createMerkleRoot.ts",
+    "create-defi-spring-root": "tsx src/createDefiSpringMerkleRoot.ts",
     "deploy-airdrop-contract": "tsx src/deployAirdropContract.ts",
+    "generate-drop": "tsx src/generateDrop.ts",
     "test": "vitest"
   },
   "author": "Moody Salem",
@@ -16,7 +17,8 @@
     "pg": "^8.11.3",
     "starknet": "^6.24.1",
     "tsx": "^4.7.1",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "viem": "^2.30.1"
   },
   "devDependencies": {
     "vitest": "^3.1.3"

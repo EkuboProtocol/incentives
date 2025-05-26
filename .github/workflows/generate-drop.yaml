@@ -1,19 +1,23 @@
-name: Create merkle root
+name: Generate drop
 
 on:
+  schedule:
+    - cron: "0 * * * *"
   workflow_dispatch:
-    inputs:
-      start_date:
-        required: true
-        description: "The ISO format start date of the date range for which to compute the merkle root"
-      end_date:
-        required: true
-        description: "The ISO format end date of the date range for which to compute the merkle root, exclusive"
 
 concurrency: query
 
 jobs:
   run:
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - database: "eth_mainnet"
+            campaigns: "ekubo_dao_wave_zero"
+            minimum_drop_size: "1000e18"
+
     runs-on: ubuntu-latest
     name: Run
     steps:
@@ -27,16 +31,15 @@ jobs:
 
       - run: npm install
 
-      - name: Create merkle root
+      - name: Generate drop
         env:
           PGHOST: ${{ secrets.POSTGRES_HOST }}
           PGPORT: ${{ secrets.POSTGRES_PORT }}
-          # this only runs on the starknet mainnet database
-          PGDATABASE: mainnet
+          PGDATABASE: ${{ matrix.database }}
           PGUSER: ${{ secrets.POSTGRES_USERNAME }}
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           PGSSLMODE: require
           NODE_TLS_REJECT_UNAUTHORIZED: 0
-          START_DATE: ${{ inputs.start_date }}
-          END_DATE: ${{ inputs.end_date }}
-        run: npm run create-root
+          CAMPAIGNS: ${{ matrix.campaigns }}
+          MIN_DROP_SIZE: ${{ matrix.minimum_drop_size }}
+        run: npm run generate-drop
