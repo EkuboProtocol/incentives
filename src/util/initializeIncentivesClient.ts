@@ -188,6 +188,9 @@ export default async function initializeIncentivesClient() {
           PRIMARY KEY (drop_id, campaign_reward_period_id)
       );
 
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_generated_drop_reward_periods_crp_id
+          ON incentives.generated_drop_reward_periods (campaign_reward_period_id);
+
       CREATE TABLE IF NOT EXISTS incentives.generated_drop_proof
       (
           drop_id INT REFERENCES incentives.generated_drop (id) ON DELETE CASCADE,
