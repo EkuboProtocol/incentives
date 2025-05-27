@@ -7,6 +7,7 @@
     "create-defi-spring-root": "tsx src/createDefiSpringMerkleRoot.ts",
     "deploy-airdrop-contract": "tsx src/deployAirdropContract.ts",
     "generate-drop": "tsx src/generateDrop.ts",
+    "fund-drops": "tsx src/fundDrops.ts",
     "test": "vitest"
   },
   "author": "Moody Salem",
