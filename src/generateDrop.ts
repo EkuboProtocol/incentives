@@ -17,11 +17,12 @@ try {
       rewards_last_computed_at: Date;
     }>({
       text: `
-                SELECT crp.id AS id, crp.rewards_last_computed_at
-                FROM incentives.campaign_reward_periods crp
-                WHERE crp.campaign_id = (SELECT id FROM incentives.campaigns WHERE slug = $1)
-                  AND crp.end_time <= CURRENT_TIMESTAMP
-            `,
+        SELECT crp.id AS id, crp.rewards_last_computed_at
+        FROM incentives.campaign_reward_periods crp
+        WHERE crp.campaign_id = (SELECT id FROM incentives.campaigns WHERE slug = $1)
+          AND crp.end_time <= CURRENT_TIMESTAMP
+          AND crp.id NOT IN (SELECT campaign_reward_period_id FROM incentives.generated_drop_reward_periods)
+      `,
       values: [slug],
     });
 
