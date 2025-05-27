@@ -1,4 +1,4 @@
-name: Generate drop
+name: Fund drops
 
 on:
   schedule:
