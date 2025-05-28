@@ -17,6 +17,9 @@ jobs:
           - database: "eth_mainnet"
             campaigns: "ekubo_dao_wave_zero"
             minimum_drop_size: "1000e18"
+          - database: "eth_sepolia"
+            campaigns: "ekubo_dao_wave_zero"
+            minimum_drop_size: "1e17"
 
     runs-on: ubuntu-latest
     name: Run
