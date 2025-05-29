@@ -16,6 +16,8 @@ export function constructMerkleTree(
   root: bigint;
   layers: bigint[][];
 } {
+  if (claimHashes.length === 0)
+    throw new Error("Airdrop cannot be constructed with zero claim hashes");
   const layers = [claimHashes];
   let lastLayer = layers[layers.length - 1];
   while (lastLayer.length > 1) {

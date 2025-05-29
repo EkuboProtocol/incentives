@@ -17,9 +17,11 @@ jobs:
           - database: "eth_mainnet"
             campaigns: "ekubo_dao_wave_zero"
             minimum_drop_size: "1000e18"
+            minimum_allocation_size: "1e13"
           - database: "eth_sepolia"
             campaigns: "ekubo_dao_wave_zero"
             minimum_drop_size: "1e17"
+            minimum_allocation_size: "1"
 
     runs-on: ubuntu-latest
     name: Run
@@ -45,4 +47,5 @@ jobs:
           NODE_TLS_REJECT_UNAUTHORIZED: 0
           CAMPAIGNS: ${{ matrix.campaigns }}
           MIN_DROP_SIZE: ${{ matrix.minimum_drop_size }}
+          MINIMUM_ALLOCATION_SIZE: ${{ matrix.minimum_allocation_size }}
         run: npm run generate-drop

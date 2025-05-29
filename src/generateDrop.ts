@@ -6,6 +6,9 @@ import { EVM_AIRDROP_CONTRACT_OPTIONS } from "./util/evmAirdropContract.js";
 const client = await initializeIncentivesClient();
 
 const MIN_DROP_SIZE = Number(process.env.MIN_DROP_SIZE ?? 0);
+const MINIMUM_ALLOCATION_SIZE = Number(
+  process.env.MINIMUM_ALLOCATION_SIZE ?? 1e13,
+);
 const CAMPAIGNS = process.env.CAMPAIGNS.split(",").map((c) => c.trim());
 
 try {
@@ -90,8 +93,8 @@ try {
         owner: BigInt(owner),
         total: BigInt(total),
       }))
-      // amounts less than 0.0001 STRK are not included
-      .filter(({ total }) => total >= 10n ** 13n)
+      // amounts less than minimum allocation size are excluded
+      .filter(({ total }) => Number(total) >= MINIMUM_ALLOCATION_SIZE)
       .sort(({ total: a }, { total: b }) => Number(b - a))
       .map(({ total, owner }) => ({ address: owner, amount: total }));
 
