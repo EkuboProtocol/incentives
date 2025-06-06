@@ -85,74 +85,74 @@ try {
 
   if (rows.length === 0) {
     console.log("No drops to fund");
-  }
+  } else {
+    const totalFundsByToken = rows.reduce<{
+      [rewardToken: `0x${string}`]: bigint;
+    }>((memo, row) => {
+      const token = checksumAddress(
+        toHex(BigInt(row.reward_token), { size: 20 }),
+      );
+      memo[token] = (memo[token] ?? 0n) + BigInt(row.total_amount);
+      return memo;
+    }, {});
 
-  const totalFundsByToken = rows.reduce<{
-    [rewardToken: `0x${string}`]: bigint;
-  }>((memo, row) => {
-    const token = checksumAddress(
-      toHex(BigInt(row.reward_token), { size: 20 }),
-    );
-    memo[token] = (memo[token] ?? 0n) + BigInt(row.total_amount);
-    return memo;
-  }, {});
+    const APPROVE_ABI = parseAbi([
+      "function approve(address spender, uint256 amount) external",
+    ]);
 
-  const APPROVE_ABI = parseAbi([
-    "function approve(address spender, uint256 amount) external",
-  ]);
+    for (const [token, amount] of Object.entries(totalFundsByToken)) {
+      const transactionHash = await walletClient.writeContract({
+        account,
+        chain,
+        abi: APPROVE_ABI,
+        address: token as `0x${string}`,
+        functionName: "approve",
+        args: [incentivesAddress, amount],
+      });
 
-  for (const [token, amount] of Object.entries(totalFundsByToken)) {
-    const transactionHash = await walletClient.writeContract({
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: transactionHash,
+      });
+      if (receipt.status === "success") {
+        console.log(
+          `Approved ${incentivesAddress} to spend ${amount} of token ${token} in transaction ${transactionHash}`,
+        );
+      } else {
+        throw new Error(`Approval tx ${transactionHash} failed`);
+      }
+    }
+
+    const fundTransactionHash = await walletClient.writeContract({
       account,
       chain,
-      abi: APPROVE_ABI,
-      address: token as `0x${string}`,
-      functionName: "approve",
-      args: [incentivesAddress, amount],
+
+      abi: INCENTIVES_ABI,
+      address: incentivesAddress,
+      functionName: "multicall",
+      args: [
+        rows.map((row) =>
+          encodeFunctionData({
+            abi: INCENTIVES_ABI,
+            functionName: "fund",
+            args: [
+              {
+                owner: owner,
+                root: toHex(BigInt(row.root), { size: 32 }),
+                token: checksumAddress(
+                  toHex(BigInt(row.reward_token), { size: 20 }),
+                ),
+              },
+              BigInt(row.total_amount),
+            ],
+          }),
+        ),
+      ],
     });
 
-    const receipt = await publicClient.waitForTransactionReceipt({
-      hash: transactionHash,
-    });
-    if (receipt.status === "success") {
-      console.log(
-        `Approved ${incentivesAddress} to spend ${amount} of token ${token} in transaction ${transactionHash}`,
-      );
-    } else {
-      throw new Error(`Approval tx ${transactionHash} failed`);
-    }
+    console.log(
+      `Funded in transaction hash ${fundTransactionHash}: https://etherscan.io/tx/${fundTransactionHash}`,
+    );
   }
-
-  const fundTransactionHash = await walletClient.writeContract({
-    account,
-    chain,
-
-    abi: INCENTIVES_ABI,
-    address: incentivesAddress,
-    functionName: "multicall",
-    args: [
-      rows.map((row) =>
-        encodeFunctionData({
-          abi: INCENTIVES_ABI,
-          functionName: "fund",
-          args: [
-            {
-              owner: owner,
-              root: toHex(BigInt(row.root), { size: 32 }),
-              token: checksumAddress(
-                toHex(BigInt(row.reward_token), { size: 20 }),
-              ),
-            },
-            BigInt(row.total_amount),
-          ],
-        }),
-      ),
-    ],
-  });
-
-  console.log(
-    `Funded in transaction hash ${fundTransactionHash}: https://etherscan.io/tx/${fundTransactionHash}`,
-  );
 } finally {
   await client.end();
 }
