@@ -12,14 +12,16 @@ try {
           id: string;
         }>({
           text: `
-              SELECT id
-              FROM incentives.campaign_reward_periods
-              WHERE rewards_last_computed_at IS NULL
-                AND end_time <= (SELECT time FROM blocks ORDER BY number DESC LIMIT 1)
-              ORDER BY end_time
-              LIMIT $1
+            SELECT id
+            FROM incentives.campaign_reward_periods
+            WHERE rewards_last_computed_at IS NULL
+              AND end_time <= (SELECT time
+                               FROM blocks
+                               WHERE hash != 0
+                               ORDER BY number DESC
+                               LIMIT 1)
+            ORDER BY end_time
           `,
-          values: [500],
         })
       ).rows.map(({ id }) => id);
 
