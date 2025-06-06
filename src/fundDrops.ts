@@ -123,7 +123,7 @@ try {
     }
   }
 
-  await walletClient.writeContract({
+  const fundTransactionHash = await walletClient.writeContract({
     account,
     chain,
 
@@ -149,6 +149,10 @@ try {
       ),
     ],
   });
+
+  console.log(
+    `Funded in transaction hash ${fundTransactionHash}: https://etherscan.io/tx/${fundTransactionHash}`,
+  );
 } finally {
   await client.end();
 }
