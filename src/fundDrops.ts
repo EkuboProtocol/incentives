@@ -1,6 +1,7 @@
 import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
 import {
   checksumAddress,
+  createPublicClient,
   createWalletClient,
   encodeFunctionData,
   http,
@@ -37,13 +38,17 @@ if (chainIndex === -1) {
 
 const chain = chains[chainIndex].config;
 
-const publicClient = createWalletClient({
+const walletClient = createWalletClient({
   transport: http(rpcUrl),
   chain,
   account,
 });
+const publicClient = createPublicClient({
+  transport: http(rpcUrl),
+  chain,
+});
 
-const chainId = await publicClient.getChainId();
+const chainId = await walletClient.getChainId();
 
 console.log(`Funding drops for chain ID ${chainId}`);
 
@@ -56,26 +61,26 @@ try {
     total_amount: string;
   }>({
     text: `
-        WITH drop_amounts AS
-                 (SELECT drop_id,
-                         SUM(amount) AS total
-                  FROM incentives.generated_drop_proof
-                  GROUP BY drop_id),
-             drop_tokens AS
-                 (SELECT drop_id, ARRAY_AGG(DISTINCT c.reward_token) AS reward_tokens
-                  FROM incentives.generated_drop_reward_periods gdrp
-                           JOIN incentives.campaign_reward_periods crp ON gdrp.campaign_reward_period_id = crp.id
-                           JOIN incentives.campaigns c ON crp.campaign_id = c.id
-                  GROUP BY gdrp.drop_id)
-        SELECT gd.root             AS root,
-               dt.reward_tokens[1] AS reward_token,
-               da.total            AS total_amount
-        FROM incentives.generated_drop gd
-                 JOIN drop_amounts da ON gd.id = da.drop_id
-                 JOIN drop_tokens dt ON gd.id = dt.drop_id
-        WHERE ARRAY_LENGTH(dt.reward_tokens, 1) = 1
-          AND gd.root NOT IN (SELECT root FROM incentives_funded)
-    `,
+            WITH drop_amounts AS
+                     (SELECT drop_id,
+                             SUM(amount) AS total
+                      FROM incentives.generated_drop_proof
+                      GROUP BY drop_id),
+                 drop_tokens AS
+                     (SELECT drop_id, ARRAY_AGG(DISTINCT c.reward_token) AS reward_tokens
+                      FROM incentives.generated_drop_reward_periods gdrp
+                               JOIN incentives.campaign_reward_periods crp ON gdrp.campaign_reward_period_id = crp.id
+                               JOIN incentives.campaigns c ON crp.campaign_id = c.id
+                      GROUP BY gdrp.drop_id)
+            SELECT gd.root             AS root,
+                   dt.reward_tokens[1] AS reward_token,
+                   da.total            AS total_amount
+            FROM incentives.generated_drop gd
+                     JOIN drop_amounts da ON gd.id = da.drop_id
+                     JOIN drop_tokens dt ON gd.id = dt.drop_id
+            WHERE ARRAY_LENGTH(dt.reward_tokens, 1) = 1
+              AND gd.root NOT IN (SELECT root FROM incentives_funded)
+        `,
   });
 
   if (rows.length === 0) {
@@ -97,7 +102,7 @@ try {
   ]);
 
   for (const [token, amount] of Object.entries(totalFundsByToken)) {
-    const transactionHash = await publicClient.writeContract({
+    const transactionHash = await walletClient.writeContract({
       account,
       chain,
       abi: APPROVE_ABI,
@@ -106,12 +111,19 @@ try {
       args: [incentivesAddress, amount],
     });
 
-    console.log(
-      `Approved ${incentivesAddress} to spend ${amount} of token ${token} in transaction ${transactionHash}`,
-    );
+    const receipt = await publicClient.waitForTransactionReceipt({
+      hash: transactionHash,
+    });
+    if (receipt.status === "success") {
+      console.log(
+        `Approved ${incentivesAddress} to spend ${amount} of token ${token} in transaction ${transactionHash}`,
+      );
+    } else {
+      throw new Error(`Approval tx ${transactionHash} failed`);
+    }
   }
 
-  await publicClient.writeContract({
+  await walletClient.writeContract({
     account,
     chain,
 
