@@ -2,7 +2,7 @@ name: Generate drop
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "0 12 * * 1"
   workflow_dispatch:
 
 concurrency: query
@@ -17,7 +17,7 @@ jobs:
           - database: "eth_mainnet"
             campaigns: "ekubo_dao_wave_zero"
             minimum_drop_size: "1000e18"
-            minimum_allocation_size: "1e13"
+            minimum_allocation_size: "1e16"
           - database: "eth_sepolia"
             campaigns: "ekubo_dao_wave_zero"
             minimum_drop_size: "1e17"
