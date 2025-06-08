@@ -2,7 +2,7 @@ name: Fund drops
 
 on:
   schedule:
-    - cron: "15 * * * *"
+    - cron: "15,30,45 12 * * *"
   workflow_dispatch:
 
 concurrency: fund
