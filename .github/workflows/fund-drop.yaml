@@ -14,12 +14,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-#          - owner: "0x00000C771F6176268D5A9846E0956C3eF58597A1"
-#            incentives_address: "0xBe4C4C4e35DED081831A1f04e24E84dEFbA75fEC"
-#            chain_id: 1
-#            rpc_url_secret: "ETH_MAINNET_RPC_URL"
-#            private_key_secret: "ETH_MAINNET_INCENTIVES_PRIVATE_KEY"
-#            database: eth_mainnet
+          - owner: "0x00000C771F6176268D5A9846E0956C3eF58597A1"
+            incentives_address: "0xBe4C4C4e35DED081831A1f04e24E84dEFbA75fEC"
+            chain_id: 1
+            rpc_url_secret: "ETH_MAINNET_RPC_URL"
+            private_key_secret: "ETH_MAINNET_INCENTIVES_PRIVATE_KEY"
+            database: eth_mainnet
           - owner: "0x00000C771F6176268D5A9846E0956C3eF58597A1"
             incentives_address: "0xBe4C4C4e35DED081831A1f04e24E84dEFbA75fEC"
             chain_id: 11155111
