@@ -15,11 +15,11 @@ import { mainnet, sepolia } from "viem/chains";
 const owner = checksumAddress(toHex(BigInt(process.env.OWNER), { size: 20 }));
 
 const incentivesAddress = checksumAddress(
-  toHex(BigInt(process.env.INCENTIVES_ADDRESS), { size: 20 }),
+  toHex(BigInt(process.env.INCENTIVES_ADDRESS), { size: 20 })
 );
 
 const account = privateKeyToAccount(
-  toHex(BigInt(process.env.PRIVATE_KEY), { size: 32 }),
+  toHex(BigInt(process.env.PRIVATE_KEY), { size: 32 })
 );
 
 const rpcUrl = process.env.RPC_URL;
@@ -30,7 +30,7 @@ const chains = [
   { id: 11155111, config: sepolia },
 ];
 const chainIndex = chains.findIndex(
-  (c) => c.id === Number(process.env.CHAIN_ID),
+  (c) => c.id === Number(process.env.CHAIN_ID)
 );
 if (chainIndex === -1) {
   throw new Error("Unsupported CHAIN ID");
@@ -86,42 +86,6 @@ try {
   if (rows.length === 0) {
     console.log("No drops to fund");
   } else {
-    const totalFundsByToken = rows.reduce<{
-      [rewardToken: `0x${string}`]: bigint;
-    }>((memo, row) => {
-      const token = checksumAddress(
-        toHex(BigInt(row.reward_token), { size: 20 }),
-      );
-      memo[token] = (memo[token] ?? 0n) + BigInt(row.total_amount);
-      return memo;
-    }, {});
-
-    const APPROVE_ABI = parseAbi([
-      "function approve(address spender, uint256 amount) external",
-    ]);
-
-    for (const [token, amount] of Object.entries(totalFundsByToken)) {
-      const transactionHash = await walletClient.writeContract({
-        account,
-        chain,
-        abi: APPROVE_ABI,
-        address: token as `0x${string}`,
-        functionName: "approve",
-        args: [incentivesAddress, amount],
-      });
-
-      const receipt = await publicClient.waitForTransactionReceipt({
-        hash: transactionHash,
-      });
-      if (receipt.status === "success") {
-        console.log(
-          `Approved ${incentivesAddress} to spend ${amount} of token ${token} in transaction ${transactionHash}`,
-        );
-      } else {
-        throw new Error(`Approval tx ${transactionHash} failed`);
-      }
-    }
-
     const fundTransactionHash = await walletClient.writeContract({
       account,
       chain,
@@ -139,18 +103,18 @@ try {
                 owner: owner,
                 root: toHex(BigInt(row.root), { size: 32 }),
                 token: checksumAddress(
-                  toHex(BigInt(row.reward_token), { size: 20 }),
+                  toHex(BigInt(row.reward_token), { size: 20 })
                 ),
               },
               BigInt(row.total_amount),
             ],
-          }),
+          })
         ),
       ],
     });
 
     console.log(
-      `Funded in transaction hash ${fundTransactionHash}: https://etherscan.io/tx/${fundTransactionHash}`,
+      `Funded in transaction hash ${fundTransactionHash}: https://etherscan.io/tx/${fundTransactionHash}`
     );
   }
 } finally {
