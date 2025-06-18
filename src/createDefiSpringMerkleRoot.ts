@@ -20,15 +20,22 @@ if (endDate.getTime() > Date.now()) {
 const client = await initializeIncentivesClient();
 
 await client.query("BEGIN;");
+await client.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;");
 
 const { rows: rewardPeriods } = await client.query<{
   id: string;
   rewards_last_computed_at: string | null;
 }>({
   text: `
-    SELECT crp.id AS id, crp.rewards_last_computed_at
-    FROM incentives.campaign_reward_periods crp
-    WHERE crp.start_time BETWEEN $1 AND $2
+    SELECT
+      crp.id AS id,
+      crp.rewards_last_computed_at
+    FROM
+      incentives.campaign_reward_periods crp
+      JOIN incentives.campaigns c ON crp.campaign_id = c.id
+    WHERE
+      c.slug = 'starknet_defi_spring'
+      AND crp.start_time BETWEEN $1 AND $2
       AND crp.end_time BETWEEN $1 AND $2
   `,
   values: [startDate, endDate],
@@ -43,7 +50,7 @@ if (rewardPeriods.some((rp) => rp.rewards_last_computed_at === null)) {
     `Some reward periods have not been computed: ${rewardPeriods
       .filter((rp) => rp.rewards_last_computed_at === null)
       .map((rp) => rp.id)
-      .join(",")}`,
+      .join(",")}`
   );
 }
 
@@ -55,7 +62,9 @@ const { rows: rewardsRaw } = await client.query<{
     WITH rewards_by_token AS (SELECT salt::BIGINT       AS token_id,
                                      SUM(reward_amount) AS total
                               FROM incentives.computed_rewards cr
-                                     WHERE cr.campaign_reward_period_id in (${rewardPeriods.map((rp) => rp.id).join(", ")})
+                                     WHERE cr.campaign_reward_period_id in (${rewardPeriods
+                                       .map((rp) => rp.id)
+                                       .join(", ")})
                               GROUP BY salt),
 
          ranked_transfers AS (SELECT token_id,
@@ -82,8 +91,6 @@ const { rows: rewardsRaw } = await client.query<{
   values: [endDate],
 });
 
-await client.query("COMMIT;");
-
 const amounts: Allocation[] = rewardsRaw
   .map(({ owner, total }) => ({
     owner: BigInt(owner),
@@ -98,8 +105,10 @@ const dropId = await generateAndInsertDrop(
   client,
   amounts,
   rewardPeriods.map((rp) => rp.id),
-  STARKNET_AIRDROP_CONTRACT_OPTIONS,
+  STARKNET_AIRDROP_CONTRACT_OPTIONS
 );
+
+await client.query("COMMIT;");
 
 console.log("Start date: ", startDate);
 console.log("End date: ", endDate);

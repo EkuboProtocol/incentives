@@ -5,53 +5,110 @@ import { EVM_AIRDROP_CONTRACT_OPTIONS } from "./util/evmAirdropContract.js";
 
 const client = await initializeIncentivesClient();
 
-const MIN_DROP_SIZE = Number(process.env.MIN_DROP_SIZE ?? 0);
 const MINIMUM_ALLOCATION_SIZE = Number(
-  process.env.MINIMUM_ALLOCATION_SIZE ?? 1e13,
+  process.env.MINIMUM_ALLOCATION_SIZE ?? 1e13
 );
 const CAMPAIGNS = process.env.CAMPAIGNS.split(",").map((c) => c.trim());
 
 try {
   for (const slug of CAMPAIGNS) {
     await client.query("BEGIN;");
+    await client.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;");
 
-    const { rows: rewardPeriods } = await client.query<{
-      id: string;
-      rewards_last_computed_at: Date;
+    const { rows: distributionPeriods } = await client.query<{
+      cadence_id: number;
+      period_ids: string[];
+      computed_ats: (Date | null)[];
     }>({
       text: `
-        SELECT crp.id AS id, crp.rewards_last_computed_at
-        FROM incentives.campaign_reward_periods crp
-        WHERE crp.campaign_id = (SELECT id FROM incentives.campaigns WHERE slug = $1)
-          AND crp.end_time <= CURRENT_TIMESTAMP
-          AND crp.id NOT IN (SELECT campaign_reward_period_id FROM incentives.generated_drop_reward_periods)
+        SELECT
+          (
+            (
+              FLOOR(
+                EXTRACT(
+                  epoch
+                  FROM
+                    (crp.end_time - c.start_time)
+                ) / EXTRACT(
+                  epoch
+                  FROM
+                    c.distribution_cadence
+                )
+              ) + 1
+            )::INT
+          ) AS cadence_id,
+          ARRAY_AGG(
+            crp.id
+            ORDER BY
+              crp.start_time
+          ) AS period_ids,
+          ARRAY_AGG(
+            crp.rewards_last_computed_at
+            ORDER BY
+              crp.start_time
+          ) AS computed_ats
+        FROM
+          incentives.campaign_reward_periods crp
+          JOIN incentives.campaigns c ON crp.campaign_id = c.id
+        WHERE
+          c.slug = $1
+          -- only periods that have ended
+          AND crp.end_time <= NOW()
+          -- only cadences whose boundary has fully lapsed
+          AND (
+            c.start_time + (
+              (
+                FLOOR(
+                  EXTRACT(
+                    epoch
+                    FROM
+                      (crp.end_time - c.start_time)
+                  ) / EXTRACT(
+                    epoch
+                    FROM
+                      c.distribution_cadence
+                  )
+                ) + 1
+              ) * c.distribution_cadence
+            )
+          ) <= NOW()
+          AND crp.id NOT IN (
+            SELECT
+              campaign_reward_period_id
+            FROM
+              incentives.generated_drop_reward_periods
+          )
+        GROUP BY
+          cadence_id
+        ORDER BY
+          cadence_id;
       `,
       values: [slug],
     });
 
-    if (rewardPeriods.length === 0) {
-      console.log(`No reward periods for campaign ${slug}`);
+    if (distributionPeriods.length === 0) {
+      console.log(`No distributions ready for campaign ${slug}`);
       continue;
     }
 
-    if (rewardPeriods.some((rp) => rp.rewards_last_computed_at === null)) {
-      console.log(
-        `Some reward periods have not been computed: ${rewardPeriods
-          .filter((rp) => rp.rewards_last_computed_at === null)
-          .map((rp) => rp.id)
-          .join(",")}`,
-      );
-      continue;
-    }
+    for (const rp of distributionPeriods) {
+      if (rp.computed_ats.some((rlca) => rlca === null)) {
+        console.log(
+          `Some reward periods have not been computed for cadence: ${rp.period_ids
+            .filter((_, ix) => rp.computed_ats[ix] === null)
+            .join(",")}`
+        );
+        continue;
+      }
 
-    const { rows: rewardsRaw } = await client.query<{
-      owner: string;
-      total: string;
-    }>({
-      text: `
+      const { rows: rewardsRaw } = await client.query<{
+        owner: string;
+        total: string;
+      }>({
+        text: `
         WITH reward_periods AS (SELECT id, end_time
                                 FROM incentives.campaign_reward_periods crp
-                                WHERE crp.id IN (${rewardPeriods.map((rp) => rp.id).join(", ")})),
+                                WHERE crp.id IN (${rp.period_ids.join(", ")})),
 
              rewards_by_token AS (SELECT salt               AS token_id,
                                          SUM(reward_amount) AS total
@@ -84,43 +141,34 @@ try {
         GROUP BY t_o.owner
         ORDER BY 2 DESC
       `,
-    });
+      });
 
-    await client.query("COMMIT;");
+      const amounts: Allocation[] = rewardsRaw
+        .map(({ owner, total }) => ({
+          owner: BigInt(owner),
+          total: BigInt(total),
+        }))
+        // amounts less than minimum allocation size are excluded
+        .filter(({ total }) => Number(total) >= MINIMUM_ALLOCATION_SIZE)
+        .sort(({ total: a }, { total: b }) => Number(b - a))
+        .map(({ total, owner }) => ({ address: owner, amount: total }));
 
-    const amounts: Allocation[] = rewardsRaw
-      .map(({ owner, total }) => ({
-        owner: BigInt(owner),
-        total: BigInt(total),
-      }))
-      // amounts less than minimum allocation size are excluded
-      .filter(({ total }) => Number(total) >= MINIMUM_ALLOCATION_SIZE)
-      .sort(({ total: a }, { total: b }) => Number(b - a))
-      .map(({ total, owner }) => ({ address: owner, amount: total }));
+      const sum = amounts.reduce((memo, { amount }) => memo + amount, 0n);
 
-    const sum = amounts.reduce((memo, { amount }) => memo + amount, 0n);
-
-    if (Number(sum) < MIN_DROP_SIZE) {
-      console.log(
-        `Skipping for campaign ${slug} because total ${sum} < ${MIN_DROP_SIZE}`,
+      const dropId = await generateAndInsertDrop(
+        client,
+        amounts,
+        rp.period_ids.map((rp) => rp),
+        EVM_AIRDROP_CONTRACT_OPTIONS
       );
-      continue;
+
+      console.log("Included periods: ", rp.period_ids.join(", "));
+      console.log("Created drop ID: ", dropId);
+      console.log("Raw total: ", sum);
+      console.log("Formatted amount: ", Number(sum) / 1e18);
     }
 
-    const dropId = await generateAndInsertDrop(
-      client,
-      amounts,
-      rewardPeriods.map((rp) => rp.id),
-      EVM_AIRDROP_CONTRACT_OPTIONS,
-    );
-
-    console.log(
-      "Included periods: ",
-      rewardPeriods.map((rp) => rp.id).join(", "),
-    );
-    console.log("Created drop ID: ", dropId);
-    console.log("Raw total: ", sum);
-    console.log("Formatted amount: ", Number(sum) / 1e18);
+    await client.query("COMMIT;");
   }
 } finally {
   await client.end();

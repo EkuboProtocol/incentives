@@ -16,7 +16,7 @@ export async function generateAndInsertDrop(
   client: Client,
   allocations: Allocation[],
   rewardPeriodIds: (string | bigint)[],
-  options: GenerateAndInsertDropOptions,
+  options: GenerateAndInsertDropOptions
 ): Promise<number> {
   const claimsWithHashes: { claim: Claim; hash: bigint }[] = allocations
     .map((allocation, ix): Claim => ({ id: ix, ...allocation }))
@@ -28,7 +28,7 @@ export async function generateAndInsertDrop(
   // Example usage:
   const { root, layers } = constructMerkleTree(
     claimsWithHashes.map(({ hash }) => hash),
-    options.siblingHashFunction,
+    options.siblingHashFunction
   );
 
   const claimsWithProofs = claimsWithHashes.map(({ hash, claim }) => ({
@@ -36,7 +36,6 @@ export async function generateAndInsertDrop(
     proof: generateProof(hash, layers),
   }));
 
-  await client.query("BEGIN;");
   const {
     rows: [{ id: dropId }],
   } = await client.query({
@@ -64,14 +63,12 @@ export async function generateAndInsertDrop(
             ({ claim: { id, address, amount }, proof }) =>
               `(${dropId}, ${id}, ${address}, ${amount}, '{${proof
                 .map((p) => p.toString())
-                .join(",")}}')`,
+                .join(",")}}')`
           )
           .join(",\n")};
     `;
 
   await client.query(insertText);
-
-  await client.query("COMMIT;");
 
   return dropId;
 }
