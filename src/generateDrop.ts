@@ -44,7 +44,7 @@ try {
             crp.rewards_last_computed_at IS NOT NULL
             ORDER BY
               crp.start_time
-          ) AS computed_ats
+          ) AS has_been_computed
         FROM
           incentives.campaign_reward_periods crp
           JOIN incentives.campaigns c ON crp.campaign_id = c.id
