@@ -90,7 +90,7 @@ try {
     minimum_allocation,
     has_been_computed,
   } of pendingDrops) {
-    if (!has_been_computed.every((is_computed) => is_computed)) {
+    if (has_been_computed.some((is_computed) => !is_computed)) {
       console.log(
         `Some reward periods have not been computed for cadence: ${period_ids
           .filter((_, ix) => !has_been_computed[ix])
