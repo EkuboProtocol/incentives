@@ -117,6 +117,10 @@ export default async function initializeIncentivesClient() {
           default_fee_denominator NUMERIC          NOT NULL,
           -- locker,salt combos that are excluded from computations
           excluded_locker_salts   incentives.locker_salt_pair[] DEFAULT '{}' NOT NULL,
+
+          -- how often drops are created for the campaign
+          distribution_cadence     INTERVAL         NOT NULL DEFAULT '1 week',
+
           PRIMARY KEY (id)
       );
 
