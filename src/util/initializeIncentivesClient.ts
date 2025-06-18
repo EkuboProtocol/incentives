@@ -121,6 +121,9 @@ export default async function initializeIncentivesClient() {
           -- how often drops are created for the campaign
           distribution_cadence     INTERVAL         NOT NULL DEFAULT '1 week',
 
+          -- the minimum amount of tokens that must be earned in the distribution cadence to receive an allocation
+          minimum_allocation     NUMERIC         NOT NULL DEFAULT 0::numeric,
+
           PRIMARY KEY (id)
       );
 
