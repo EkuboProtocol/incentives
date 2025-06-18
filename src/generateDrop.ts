@@ -152,6 +152,15 @@ try {
       .sort(({ total: a }, { total: b }) => Number(b - a))
       .map(({ total, owner }) => ({ address: owner, amount: total }));
 
+    if (amounts.length === 0) {
+      console.log(
+        `No allocations met the threshold for the following periods: ${period_ids
+          .filter((_, ix) => !has_been_computed[ix])
+          .join(", ")}`
+      );
+      continue;
+    }
+
     const sum = amounts.reduce((memo, { amount }) => memo + amount, 0n);
 
     const dropId = await generateAndInsertDrop(
