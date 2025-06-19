@@ -30,7 +30,7 @@ const airdropClassHash =
 const constructorCalldata = [distributedToken, root, "0x0", "0x0"];
 console.log(
   `Deploying airdrop with class hash ${airdropClassHash} and arguments`,
-  constructorCalldata,
+  constructorCalldata
 );
 
 const deployResponse = await deployerAccount.deployContract({
