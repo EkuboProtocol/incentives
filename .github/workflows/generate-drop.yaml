@@ -14,7 +14,9 @@ jobs:
       matrix:
         include:
           - database: "eth_mainnet"
+            network_type: "EVM"
           - database: "eth_sepolia"
+            network_type: "EVM"
 
     runs-on: ubuntu-latest
     name: Run
@@ -33,9 +35,10 @@ jobs:
         env:
           PGHOST: ${{ secrets.POSTGRES_HOST }}
           PGPORT: ${{ secrets.POSTGRES_PORT }}
-          PGDATABASE: ${{ matrix.database }}
           PGUSER: ${{ secrets.POSTGRES_USERNAME }}
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           PGSSLMODE: require
           NODE_TLS_REJECT_UNAUTHORIZED: 0
+          PGDATABASE: ${{ matrix.database }}
+          NETWORK_TYPE: ${{ matrix.network_type }}
         run: npm run generate-drop

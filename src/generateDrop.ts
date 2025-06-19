@@ -2,6 +2,23 @@ import { Allocation } from "./util/airdrop.js";
 import { generateAndInsertDrop } from "./util/generateAndInsertDrop.js";
 import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
 import { EVM_AIRDROP_CONTRACT_OPTIONS } from "./util/evmAirdropContract.js";
+import { STARKNET_AIRDROP_CONTRACT_OPTIONS } from "./util/starknetAirdropContract.js";
+
+const AIRDROP_CONTRACT_OPTIONS_BY_NETWORK_TYPE = {
+  STARKNET: STARKNET_AIRDROP_CONTRACT_OPTIONS,
+  EVM: EVM_AIRDROP_CONTRACT_OPTIONS,
+};
+
+const airdropContractOptions =
+  AIRDROP_CONTRACT_OPTIONS_BY_NETWORK_TYPE[process.env.NETWORK_TYPE];
+
+if (!airdropContractOptions) {
+  throw new Error(
+    `NETWORK_TYPE must be one of ${Object.keys(
+      AIRDROP_CONTRACT_OPTIONS_BY_NETWORK_TYPE
+    ).join(", ")}`
+  );
+}
 
 const client = await initializeIncentivesClient();
 
@@ -167,7 +184,7 @@ try {
       client,
       amounts,
       period_ids,
-      EVM_AIRDROP_CONTRACT_OPTIONS
+      airdropContractOptions
     );
 
     console.log("Campaign: ", slug);
