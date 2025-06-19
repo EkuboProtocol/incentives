@@ -23,16 +23,16 @@ try {
           (
             (
               FLOOR(
-                EXTRACT(
+                (EXTRACT(
                   epoch
                   FROM
                     (crp.end_time - c.start_time)
-                ) / EXTRACT(
+                ) - 1) / EXTRACT(
                   epoch
                   FROM
                     c.distribution_cadence
                 )
-              ) + 1
+              )
             )::INT
           ) AS cadence_id,
           ARRAY_AGG(
