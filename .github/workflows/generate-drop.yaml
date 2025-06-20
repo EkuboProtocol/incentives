@@ -17,6 +17,10 @@ jobs:
             network_type: "EVM"
           - database: "eth_sepolia"
             network_type: "EVM"
+          - database: "mainnet"
+            network_type: "STARKNET"
+          - database: "sepolia"
+            network_type: "STARKNET"
 
     runs-on: ubuntu-latest
     name: Run
