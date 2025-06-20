@@ -171,9 +171,9 @@ try {
 
     if (amounts.length === 0) {
       console.log(
-        `No allocations met the threshold for the following periods: ${period_ids
-          .filter((_, ix) => !has_been_computed[ix])
-          .join(", ")}`
+        `No allocations met the threshold for the following periods: ${period_ids.join(
+          ", "
+        )}`
       );
       continue;
     }
