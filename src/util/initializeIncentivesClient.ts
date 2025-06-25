@@ -105,8 +105,6 @@ export default async function initializeIncentivesClient() {
           slug                    VARCHAR(20)      NOT NULL,
           -- the token that is being used for rewards
           reward_token            NUMERIC          NOT NULL,
-          -- the amount available for rewards
-          budget                  NUMERIC          NOT NULL,
           -- the extensions that can be incentivized
           allowed_extensions      NUMERIC[]                     DEFAULT '{0}' NOT NULL,
           -- the default percent step for the campaign
@@ -266,9 +264,9 @@ export default async function initializeIncentivesClient() {
 
           -- insert campaign
           INSERT INTO incentives.campaigns
-          (name, slug, start_time, end_time, reward_token, budget, allowed_extensions, excluded_locker_salts,
+          (name, slug, start_time, end_time, reward_token, allowed_extensions, excluded_locker_salts,
            default_fee_denominator)
-          VALUES (p_name, p_slug, p_start_time, p_end_time, p_reward_token, v_total_budget, p_allowed_extensions,
+          VALUES (p_name, p_slug, p_start_time, p_end_time, p_reward_token, p_allowed_extensions,
                   p_excluded_locker_salts, p_default_fee_denominator)
           RETURNING id INTO v_campaign_id;
 
