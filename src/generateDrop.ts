@@ -51,14 +51,13 @@ try {
           (start_time + distribution_cadence * (cadence_id + 1)) AS end_time
         FROM
           campaign_info,
-          generate_series(0, num_distributions) AS cadence_id
+          generate_series(0, num_distributions - 1) AS cadence_id
       ),
       cadence_periods AS (
         SELECT
           c.campaign_id,
           c.cadence_id,
           array_agg(crp.id ORDER BY crp.start_time) AS period_ids,
-          array_agg(crp.rewards_last_computed_at IS NOT NULL ORDER BY crp.start_time) AS has_been_computed,
           min(crp.start_time) first_start_time,
           max(crp.end_time) last_end_time
         FROM
@@ -67,13 +66,14 @@ try {
             AND crp.start_time BETWEEN c.start_time AND c.end_time
             AND crp.end_time BETWEEN c.start_time AND c.end_time
         WHERE
-          crp.id NOT IN (
+          crp.rewards_last_computed_at IS NOT NULL
+          AND crp.id NOT IN (
             SELECT
               campaign_reward_period_id
             FROM
               incentives.generated_drop_reward_periods)
           GROUP BY
-            c. campaign_id,
+            c.campaign_id,
             cadence_id
       )
       SELECT
@@ -84,13 +84,7 @@ try {
         cadence_periods cp
         JOIN cadences c ON cp.campaign_id = c.campaign_id
           AND cp.cadence_id = c.cadence_id
-        JOIN campaign_info ci ON c.campaign_id = ci.id
-      WHERE
-        -- all periods have been computed
-        TRUE = ALL (cp.has_been_computed)
-        -- the first period starts at the start time and the last period ends at the end time
-        AND cp.first_start_time = c.start_time
-        AND cp.last_end_time = c.end_time;
+        JOIN campaign_info ci ON c.campaign_id = ci.id;
       `,
   });
 
