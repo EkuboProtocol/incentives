@@ -58,6 +58,11 @@ try {
           c.campaign_id,
           c.cadence_id,
           array_agg(crp.id ORDER BY crp.start_time) AS period_ids,
+          array_agg(crp.rewards_last_computed_at IS NOT NULL) AS has_been_computed,
+          array_agg(crp.id IN (
+              SELECT
+                campaign_reward_period_id
+              FROM incentives.generated_drop_reward_periods)) AS has_been_dropped,
           min(crp.start_time) first_start_time,
           max(crp.end_time) last_end_time
         FROM
@@ -65,16 +70,9 @@ try {
           JOIN cadences c ON crp.campaign_id = c.campaign_id
             AND crp.start_time BETWEEN c.start_time AND c.end_time
             AND crp.end_time BETWEEN c.start_time AND c.end_time
-        WHERE
-          crp.rewards_last_computed_at IS NOT NULL
-          AND crp.id NOT IN (
-            SELECT
-              campaign_reward_period_id
-            FROM
-              incentives.generated_drop_reward_periods)
-          GROUP BY
-            c.campaign_id,
-            cadence_id
+        GROUP BY
+          c.campaign_id,
+          cadence_id
       )
       SELECT
         ci.slug,
@@ -84,7 +82,12 @@ try {
         cadence_periods cp
         JOIN cadences c ON cp.campaign_id = c.campaign_id
           AND cp.cadence_id = c.cadence_id
-        JOIN campaign_info ci ON c.campaign_id = ci.id;
+        JOIN campaign_info ci ON c.campaign_id = ci.id
+      WHERE
+        TRUE = ALL (cp.has_been_computed)
+        AND FALSE = ALL (cp.has_been_dropped)
+        AND cp.first_start_time = c.start_time
+        AND cp.last_end_time = c.end_time;
       `,
   });
 
