@@ -139,6 +139,21 @@ try {
 
     const minimumAllocation = BigInt(minimum_allocation);
 
+    const filteredStats = rewardsRaw.reduce<{ amount: bigint; count: number }>(
+      (memo, { total }) => {
+        const filtered = BigInt(total) < minimumAllocation;
+        if (filtered) {
+          return {
+            count: memo.count + 1,
+            amount: memo.amount + BigInt(total),
+          };
+        } else {
+          return memo;
+        }
+      },
+      { amount: 0n, count: 0 }
+    );
+
     const amounts: Allocation[] = rewardsRaw
       .map(({ owner, total }) => ({
         owner: BigInt(owner),
@@ -170,7 +185,8 @@ try {
     console.log("Periods: ", period_ids.join(", "));
     console.log("Created drop ID: ", dropId);
     console.log("Raw total: ", sum);
-    console.log("Minimum allocation: ", minimumAllocation);
+    console.log("Minimum allocation: ", Number(minimumAllocation) / 1e18);
+    console.log("Filtered out: ", filteredStats);
     console.log("Formatted amount: ", Number(sum) / 1e18);
   }
 
