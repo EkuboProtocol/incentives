@@ -38,6 +38,7 @@ try {
           slug,
           minimum_allocation,
           start_time,
+          end_time,
           distribution_cadence,
           floor(extract(epoch FROM CURRENT_TIMESTAMP - start_time) / extract(epoch FROM distribution_cadence)) AS num_distributions
         FROM
@@ -48,10 +49,10 @@ try {
           id AS campaign_id,
           cadence_id,
           (start_time + distribution_cadence * cadence_id) AS start_time,
-          (start_time + distribution_cadence * (cadence_id + 1)) AS end_time
+          LEAST((start_time + distribution_cadence * (cadence_id + 1)), ci.end_time) AS end_time
         FROM
-          campaign_info,
-          generate_series(0, num_distributions - 1) AS cadence_id
+          campaign_info ci,
+          generate_series(0, num_distributions) AS cadence_id
       ),
       cadence_periods AS (
         SELECT
