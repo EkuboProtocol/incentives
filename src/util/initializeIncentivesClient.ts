@@ -158,7 +158,7 @@ export default async function initializeIncentivesClient() {
       );
 
       CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_reward_periods_pair_period
-          ON incentives.campaign_reward_periods (token0, token1, start_time, end_time);
+          ON incentives.campaign_reward_periods (campaign_id, token0, token1, start_time, end_time);
 
       CREATE TABLE IF NOT EXISTS incentives.computed_rewards
       (
