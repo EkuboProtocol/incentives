@@ -7,7 +7,7 @@ on:
     inputs:
       campaign_slug:
         required: false
-        default: "starknet_btcfi"
+        default: "btcfi_season"
         type: "string"
         description: "The slug of the campaign where the rewards should be entered"
       btcfi_incentives_url:

@@ -4,7 +4,7 @@ import { fetchTokens } from "./util/tokens.js";
 import { floatToRawValue } from "./util/floatToRawValue.js";
 import { fetchEkuboBtcFiData } from "./util/btcFiApi.js";
 
-const campaignSlug = process.env.CAMPAIGN_SLUG || "starknet_btcfi_season";
+const campaignSlug = process.env.CAMPAIGN_SLUG || "btcfi_season";
 
 const [ekuboIncentivesData, tokens] = await Promise.all([
   fetchEkuboBtcFiData(
