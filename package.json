@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "sync-defi-spring": "tsx src/syncDefiSpring.ts",
+    "sync-btcfi": "tsx src/syncBtcFi.ts",
     "compute-distributions": "tsx src/computeDistributions.ts",
     "deploy-airdrop-contract": "tsx src/deployAirdropContract.ts",
     "generate-drop": "tsx src/generateDrop.ts",

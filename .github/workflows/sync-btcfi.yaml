@@ -1,0 +1,53 @@
+name: Sync BTCFI
+
+on:
+  schedule:
+    - cron: "*/15 0-8 * * *"
+  workflow_dispatch:
+    inputs:
+      campaign_slug:
+        required: false
+        default: "starknet_btcfi"
+        type: "string"
+        description: "The slug of the campaign where the rewards should be entered"
+      btcfi_incentives_url:
+        required: false
+        default: "https://www.data-openblocklabs.com/starknet/dex-incentives/ekubo?page=1&size=1000"
+        description: "The URL of the DeFi Spring Incentives to sync"
+      tokens_url:
+        required: false
+        default: "https://starknet-mainnet-api.ekubo.org/tokens"
+        description: "The URL of the Starknet tokens information endpoint"
+
+concurrency: sync-defi-spring
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    name: Run
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - run: npm install
+
+      - name: Sync
+        env:
+          PGHOST: ${{ secrets.POSTGRES_HOST }}
+          PGPORT: ${{ secrets.POSTGRES_PORT }}
+          # this only runs on the starknet mainnet database
+          PGDATABASE: mainnet
+          PGUSER: ${{ secrets.POSTGRES_USERNAME }}
+          PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          PGSSLMODE: require
+          NODE_TLS_REJECT_UNAUTHORIZED: 0
+          CAMPAIGN_SLUG: ${{ inputs.campaign_slug }}
+          BTC_FI_INCENTIVES_URL: ${{ inputs.btcfi_incentives_url }}
+          TOKENS_URL: ${{ inputs.tokens_url }}
+
+        run: npm run sync-defi-spring
