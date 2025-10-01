@@ -4,12 +4,12 @@ import { fetchTokens } from "./util/tokens.js";
 import { floatToRawValue } from "./util/floatToRawValue.js";
 import { fetchEkuboBtcFiData } from "./util/btcFiApi.js";
 
-const campaignSlug = process.env.CAMPAIGN_SLUG || "starknet_btcfi";
+const campaignSlug = process.env.CAMPAIGN_SLUG || "starknet_btcfi_season";
 
 const [ekuboIncentivesData, tokens] = await Promise.all([
   fetchEkuboBtcFiData(
     process.env.BTC_FI_INCENTIVES_URL ||
-      "https://www.data-openblocklabs.com/starknet/dex-incentives/ekubo?page=1&size=1000"
+      "https://www.data-openblocklabs.com/starknet/dex-incentives/ekubo"
   ),
   fetchTokens(
     process.env.TOKENS_URL || "https://starknet-mainnet-api.ekubo.org/tokens"

@@ -12,7 +12,7 @@ on:
         description: "The slug of the campaign where the rewards should be entered"
       btcfi_incentives_url:
         required: false
-        default: "https://www.data-openblocklabs.com/starknet/dex-incentives/ekubo?page=1&size=1000"
+        default: "https://www.data-openblocklabs.com/starknet/dex-incentives/ekubo"
         description: "The URL of the DeFi Spring Incentives to sync"
       tokens_url:
         required: false
