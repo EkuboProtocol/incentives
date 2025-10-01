@@ -50,4 +50,4 @@ jobs:
           BTC_FI_INCENTIVES_URL: ${{ inputs.btcfi_incentives_url }}
           TOKENS_URL: ${{ inputs.tokens_url }}
 
-        run: npm run sync-defi-spring
+        run: npm run sync-btcfi
