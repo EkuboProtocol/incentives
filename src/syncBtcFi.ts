@@ -60,8 +60,6 @@ const incentiveRewardPeriodRowData = ekuboIncentivesData.items
   })
   .filter((d) => d.token0RewardAmount !== 0n || d.token1RewardAmount !== 0n);
 
-console.log(incentiveRewardPeriodRowData);
-
 const client = await initializeIncentivesClient();
 
 await client.query(`BEGIN;`);
