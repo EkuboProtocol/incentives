@@ -24,39 +24,44 @@ const strkToken = tokensWithStrkSymbol[0];
 
 const incentiveRewardPeriodRowData = ekuboIncentivesData.items
   .map((d) => {
-    const token0 = tokens.find(
-      (t) => BigInt(t.l2_token_address) === BigInt(d.token0_address)
-    );
-    const token1 = tokens.find(
-      (t) => BigInt(t.l2_token_address) === BigInt(d.token1_address)
-    );
+    try {
+      const token0 = tokens.find(
+        (t) => BigInt(t.l2_token_address) === BigInt(d.token0_address)
+      );
+      const token1 = tokens.find(
+        (t) => BigInt(t.l2_token_address) === BigInt(d.token1_address)
+      );
 
-    if (!token0) throw new Error(`Token not found: ${d.token0_symbol}`);
-    if (!token1) throw new Error(`Token not found: ${d.token1_symbol}`);
+      if (!token0) throw new Error(`Token not found: ${d.token0_symbol}`);
+      if (!token1) throw new Error(`Token not found: ${d.token1_symbol}`);
 
-    if (BigInt(token0.l2_token_address) >= BigInt(token1.l2_token_address)) {
-      throw new Error("Invalid sort order");
+      if (BigInt(token0.l2_token_address) >= BigInt(token1.l2_token_address)) {
+        throw new Error("Invalid sort order");
+      }
+
+      const startDate = new Date(`${d.date}T00:00:00Z`);
+      const endDate = new Date(startDate.getTime() + 86_400_000);
+      const realizedVolatility = d.realized_volatility;
+      const token0RewardAmount = BigInt(
+        floatToRawValue(d.token0_allocation, strkToken.decimals)
+      );
+      const token1RewardAmount = BigInt(
+        floatToRawValue(d.token1_allocation, strkToken.decimals)
+      );
+
+      return {
+        token0,
+        token1,
+        startDate,
+        endDate,
+        realizedVolatility,
+        token0RewardAmount,
+        token1RewardAmount,
+      };
+    } catch (e) {
+      console.error("Failed to parse row: ", d, e);
+      throw e;
     }
-
-    const startDate = new Date(`${d.date}T00:00:00Z`);
-    const endDate = new Date(startDate.getTime() + 86_400_000);
-    const realizedVolatility = d.realized_volatility;
-    const token0RewardAmount = BigInt(
-      floatToRawValue(d.token0_allocation, strkToken.decimals)
-    );
-    const token1RewardAmount = BigInt(
-      floatToRawValue(d.token1_allocation, strkToken.decimals)
-    );
-
-    return {
-      token0,
-      token1,
-      startDate,
-      endDate,
-      realizedVolatility,
-      token0RewardAmount,
-      token1RewardAmount,
-    };
   })
   .filter((d) => d.token0RewardAmount !== 0n || d.token1RewardAmount !== 0n);
 
