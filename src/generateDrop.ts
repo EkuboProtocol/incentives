@@ -30,6 +30,8 @@ try {
     slug: string;
     minimum_allocation: string;
     period_ids: string[];
+    first_start_time: Date;
+    last_end_time: Date;
   }>({
     text: `
       WITH campaign_info AS (
@@ -48,11 +50,22 @@ try {
         SELECT
           id AS campaign_id,
           cadence_id,
-          (start_time + distribution_cadence * cadence_id) AS start_time,
-          LEAST((start_time + distribution_cadence * (cadence_id + 1)), ci.end_time) AS end_time
-        FROM
-          campaign_info ci,
-          generate_series(0, num_distributions) AS cadence_id
+          (
+            CASE WHEN cadence_id = 0 THEN
+            (
+              SELECT
+                min(start_time)
+              FROM
+                incentives.campaign_reward_periods crp2
+              WHERE
+                crp2.campaign_id = ci.id)
+            ELSE
+              start_time + distribution_cadence * cadence_id
+            END) AS start_time,
+        LEAST ((start_time + distribution_cadence * (cadence_id + 1)), ci.end_time) AS end_time
+      FROM
+        campaign_info ci,
+        generate_series(0, num_distributions) AS cadence_id
       ),
       cadence_periods AS (
         SELECT
@@ -69,8 +82,10 @@ try {
         FROM
           incentives.campaign_reward_periods crp
           JOIN cadences c ON crp.campaign_id = c.campaign_id
-            AND crp.start_time BETWEEN c.start_time AND c.end_time
-            AND crp.end_time BETWEEN c.start_time AND c.end_time
+            AND crp.start_time >= c.start_time
+            AND crp.start_time <= c.end_time
+            AND crp.end_time >= c.start_time
+            AND crp.end_time <= c.end_time
         GROUP BY
           c.campaign_id,
           cadence_id
@@ -78,7 +93,9 @@ try {
       SELECT
         ci.slug,
         ci.minimum_allocation,
-        cp.period_ids
+        cp.period_ids,
+        cp.first_start_time,
+        cp.last_end_time
       FROM
         cadence_periods cp
         JOIN cadences c ON cp.campaign_id = c.campaign_id
@@ -92,7 +109,17 @@ try {
       `,
   });
 
-  for (const { slug, period_ids, minimum_allocation } of pendingDrops) {
+  for (const {
+    slug,
+    period_ids,
+    minimum_allocation,
+    first_start_time,
+    last_end_time,
+  } of pendingDrops) {
+    console.log(
+      `Computing drop for ${slug} for periods between ${first_start_time} to ${last_end_time}`
+    );
+
     const { rows: rewardsRaw } = await client.query<{
       owner: string;
       total: string;
@@ -181,6 +208,8 @@ try {
 
     console.log("Campaign: ", slug);
     console.log("Periods: ", period_ids.join(", "));
+    console.log("First start time: ", first_start_time);
+    console.log("Last end time: ", last_end_time);
     console.log("Created drop ID: ", dropId);
     console.log("Raw total: ", sum);
     console.log("Minimum allocation: ", Number(minimumAllocation) / 1e18);

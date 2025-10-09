@@ -95,7 +95,7 @@ export default async function initializeIncentivesClient() {
       CREATE TABLE IF NOT EXISTS incentives.campaigns
       (
           id                      SERIAL8          NOT NULL,
-          -- when the campaign is expected to start
+          -- when the campaign rewards are expected to start accumulating
           start_time              timestamptz      NOT NULL,
           -- when campaign will end, if it is known
           end_time                timestamptz,
