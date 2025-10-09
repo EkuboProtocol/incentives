@@ -20,12 +20,12 @@ if (!airdropContractOptions) {
   );
 }
 
-const POSITION_NFT_TOKEN_ADDRESS = BigInt(
-  process.env.POSITION_NFT_TOKEN_ADDRESS ?? 0
+const POSITIONS_LOCKER_ADDRESS = BigInt(
+  process.env.POSITIONS_LOCKER_ADDRESS ?? 0
 );
 
-if (!POSITION_NFT_TOKEN_ADDRESS) {
-  throw new Error(`Missing POSITION_NFT_TOKEN_ADDRESS env variable`);
+if (!POSITIONS_LOCKER_ADDRESS) {
+  throw new Error(`Missing "POSITIONS_LOCKER_ADDRESS" env variable`);
 }
 
 const client = await initializeIncentivesClient();
@@ -132,7 +132,7 @@ try {
       owner: string;
       total: string;
     }>({
-      values: [POSITION_NFT_TOKEN_ADDRESS],
+      values: [POSITIONS_LOCKER_ADDRESS],
       text: `
         WITH reward_periods AS (
           SELECT

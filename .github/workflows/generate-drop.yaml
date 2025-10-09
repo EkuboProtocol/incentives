@@ -15,16 +15,16 @@ jobs:
         include:
           - database: "eth_mainnet"
             network_type: "EVM"
-            positions_nft_address: "0xA37cc341634AFD9E0919D334606E676dbAb63E17"
+            positions_locker_address: "0xA37cc341634AFD9E0919D334606E676dbAb63E17"
           - database: "eth_sepolia"
             network_type: "EVM"
-            positions_nft_address: "0xA37cc341634AFD9E0919D334606E676dbAb63E17"
+            positions_locker_address: "0xA37cc341634AFD9E0919D334606E676dbAb63E17"
           - database: "mainnet"
             network_type: "STARKNET"
-            positions_nft_address: "0x07b696af58c967c1b14c9dde0ace001720635a660a8e90c565ea459345318b30"
+            positions_locker_address: "0x02e0af29598b407c8716b17f6d2795eca1b471413fa03fb145a5e33722184067"
           - database: "sepolia"
             network_type: "STARKNET"
-            positions_nft_address: "0x04afc78d6fec3b122fc1f60276f074e557749df1a77a93416451be72c435120f"
+            positions_locker_address: "0x06a2aee84bb0ed5dded4384ddd0e40e9c1372b818668375ab8e3ec08807417e5"
 
     runs-on: ubuntu-latest
     name: Run
@@ -49,5 +49,5 @@ jobs:
           NODE_TLS_REJECT_UNAUTHORIZED: 0
           PGDATABASE: ${{ matrix.database }}
           NETWORK_TYPE: ${{ matrix.network_type }}
-          POSITION_NFT_TOKEN_ADDRESS: ${{ matrix.positions_nft_address }}
+          POSITIONS_LOCKER_ADDRESS: ${{ matrix.positions_locker_address }}
         run: npm run generate-drop
