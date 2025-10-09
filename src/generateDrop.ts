@@ -20,6 +20,14 @@ if (!airdropContractOptions) {
   );
 }
 
+const POSITION_NFT_TOKEN_ADDRESS = BigInt(
+  process.env.POSITION_NFT_TOKEN_ADDRESS ?? 0
+);
+
+if (!POSITION_NFT_TOKEN_ADDRESS) {
+  throw new Error(`Missing POSITION_NFT_TOKEN_ADDRESS env variable`);
+}
+
 const client = await initializeIncentivesClient();
 
 try {
@@ -124,41 +132,73 @@ try {
       owner: string;
       total: string;
     }>({
+      values: [POSITION_NFT_TOKEN_ADDRESS],
       text: `
-          WITH reward_periods AS (SELECT id, end_time
-                                  FROM incentives.campaign_reward_periods crp
-                                  WHERE crp.id IN (${period_ids.join(", ")})),
-
-              rewards_by_token AS (SELECT salt               AS token_id,
-                                          SUM(reward_amount) AS total
-                                    FROM incentives.computed_rewards cr
-                                    WHERE cr.campaign_reward_period_id IN (SELECT id FROM reward_periods)
-                                    GROUP BY salt),
-
-              last_reward_period_end_time AS (SELECT MAX(end_time) AS last_end_time
-                                              FROM reward_periods),
-
-              ranked_transfers AS (SELECT token_id,
-                                          to_address,
-                                          ROW_NUMBER() OVER (PARTITION BY token_id ORDER BY event_id DESC) AS row_no
-                                    FROM position_transfers pt
-                                          JOIN event_keys ek ON pt.event_id = ek.id
-                                          JOIN blocks b ON ek.block_number = b.number,
-                                        last_reward_period_end_time
-                                    WHERE to_address != 0
-                                      AND b.time < last_reward_period_end_time.last_end_time),
-
-              token_owners AS (SELECT token_id,
-                                      to_address AS owner
-                                FROM ranked_transfers
-                                WHERE row_no = 1)
-
-          SELECT owner,
-                FLOOR(SUM(rbt.total)) AS total
-          FROM rewards_by_token rbt
-                JOIN token_owners t_o ON t_o.token_id = rbt.token_id
-          GROUP BY t_o.owner
-          ORDER BY 2 DESC
+        WITH reward_periods AS (
+          SELECT
+            id,
+            end_time
+          FROM
+            incentives.campaign_reward_periods crp
+          WHERE
+            crp.id IN (${period_ids.join(", ")})
+        ),
+        rewards_by_locker_salt AS (
+          SELECT
+            locker,
+            salt,
+            sum(reward_amount) AS total
+          FROM
+            incentives.computed_rewards cr
+          WHERE
+            cr.campaign_reward_period_id IN (
+              SELECT
+                id
+              FROM
+                reward_periods)
+            GROUP BY
+              locker,
+              salt
+        ),
+        last_reward_period_end_time AS (
+          SELECT
+            max(end_time) AS last_end_time
+        FROM
+          reward_periods
+        ),
+        ranked_transfers AS (
+          SELECT
+            token_id,
+            to_address,
+            row_number() OVER (PARTITION BY token_id ORDER BY event_id DESC) AS row_no
+        FROM
+          position_transfers pt
+          JOIN event_keys ek ON pt.event_id = ek.id
+          JOIN blocks b ON ek.block_number = b.number,
+          last_reward_period_end_time
+          WHERE
+            to_address != 0
+            AND b.time < last_reward_period_end_time.last_end_time
+        ),
+        token_owners AS (
+          SELECT
+            token_id,
+            to_address AS owner
+          FROM
+            ranked_transfers
+          WHERE
+            row_no = 1
+        )
+        SELECT
+          coalesce(t_o.owner, rbls.locker) AS owner,
+          floor(sum(rbls.total)) AS total
+        FROM
+          rewards_by_locker_salt rbls
+          LEFT JOIN token_owners t_o ON t_o.token_id = rbls.salt AND rbls.locker = $1
+        GROUP BY
+          1
+        ORDER BY
+          2 DESC
         `,
     });
 
