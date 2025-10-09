@@ -54,7 +54,7 @@ try {
             CASE WHEN cadence_id = 0 THEN
             (
               SELECT
-                min(start_time)
+                min(crp2.start_time)
               FROM
                 incentives.campaign_reward_periods crp2
               WHERE
