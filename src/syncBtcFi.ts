@@ -83,11 +83,10 @@ try {
     throw new Error(`Campaign with slug ${campaignSlug} not found`);
   }
 
-  const { rowCount } = await client.query({
-    text: `
+  const queryText = `
         INSERT INTO incentives.campaign_reward_periods (campaign_id, token0, token1, start_time, end_time,
                                                         realized_volatility, token0_reward_amount,
-                                                        token1_reward_amount)
+                                                        token1_reward_amount, rewards_last_computed_at)
         VALUES
         ${incentiveRewardPeriodRowData
           .map(
@@ -102,12 +101,26 @@ try {
             }) =>
               `(${campaign.id}, ${BigInt(token0.l2_token_address)}, ${BigInt(
                 token1.l2_token_address
-              )}, '${startDate.toISOString()}', '${endDate.toISOString()}', ${realizedVolatility}, ${token0RewardAmount}, ${token1RewardAmount})`
+              )}, '${startDate.toISOString()}', '${endDate.toISOString()}', ${realizedVolatility}, ${token0RewardAmount}, ${token1RewardAmount}, null)`
           )
           .join(",\n")}
-            ON CONFLICT
-        DO NOTHING;
-    `,
+        ON CONFLICT (campaign_id, token0, token1, start_time, end_time)
+        DO UPDATE SET
+            token0_reward_amount = EXCLUDED.token0_reward_amount,
+            token1_reward_amount = EXCLUDED.token1_reward_amount,
+            rewards_last_computed_at = CASE
+                WHEN (incentives.campaign_reward_periods.token0_reward_amount != EXCLUDED.token0_reward_amount
+                  OR incentives.campaign_reward_periods.token1_reward_amount != EXCLUDED.token1_reward_amount) AND
+                  incentives.campaign_reward_periods.id NOT IN (SELECT campaign_reward_period_id FROM incentives.generated_drop_reward_periods)
+                THEN NULL
+                ELSE incentives.campaign_reward_periods.rewards_last_computed_at
+            END;
+    `;
+
+  console.log("Running query", queryText);
+
+  const { rowCount } = await client.query({
+    text: queryText,
   });
 
   await client.query(`COMMIT;`);
