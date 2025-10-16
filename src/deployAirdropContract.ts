@@ -1,6 +1,7 @@
 import { Account, RpcProvider } from "starknet";
 import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
 import TelegramBot from "node-telegram-bot-api";
+import { fetchTokens } from "./util/tokens.js";
 
 // Environment variables for Telegram
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -172,6 +173,11 @@ End: \`${endDate.toISOString()}\`
   }
 }
 
+// Fetch token metadata from API
+const tokens = await fetchTokens(
+  process.env.TOKENS_URL || "https://starknet-mainnet-api.ekubo.org/tokens",
+);
+
 const client = await initializeIncentivesClient();
 
 try {
@@ -261,23 +267,23 @@ try {
 
   console.log(`Found ${drops.length} drop(s) to deploy`);
 
-  // Get token information (symbol and decimals)
-  // For Starknet, we'll need to query this from the token contract or use a known mapping
-  // For now, we'll assume STRK token with 18 decimals as a default
-  const TOKEN_INFO: Record<string, { symbol: string; decimals: number }> = {
-    "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d": {
-      symbol: "STRK",
-      decimals: 18,
-    },
-  };
-
   for (const dropFromDB of drops) {
     console.log(`\nProcessing drop ID ${dropFromDB.drop_id}`);
 
-    // Validate that all periods use the same token
-    const tokenInfo = TOKEN_INFO[dropFromDB.reward_token] || {
-      symbol: "UNKNOWN",
-      decimals: 18,
+    // Get token information from fetched tokens
+    const token = tokens.find(
+      (t) => BigInt(t.l2_token_address) === BigInt(dropFromDB.reward_token),
+    );
+
+    if (!token) {
+      throw new Error(
+        `Token not found for address: ${dropFromDB.reward_token}`,
+      );
+    }
+
+    const tokenInfo = {
+      symbol: token.symbol,
+      decimals: token.decimals,
     };
 
     // Create enriched drop info with token metadata
