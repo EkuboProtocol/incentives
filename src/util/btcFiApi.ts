@@ -1,7 +1,7 @@
 export function fetchEkuboBtcFiData(
   baseApiUrl: string = "https://www.data-openblocklabs.com/starknet/dex-incentives/ekubo",
   page: number = 1,
-  size: number = 1000
+  size: number = 1000,
 ): Promise<{
   items: {
     date: string;

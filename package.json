@@ -8,7 +8,9 @@
     "deploy-airdrop-contract": "tsx src/deployAirdropContract.ts",
     "generate-drop": "tsx src/generateDrop.ts",
     "fund-drops": "tsx src/fundDrops.ts",
-    "test": "vitest"
+    "test": "vitest",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "author": "Moody Salem",
   "type": "module",
@@ -22,6 +24,7 @@
     "viem": "^2.30.1"
   },
   "devDependencies": {
+    "prettier": "^3.4.2",
     "vitest": "^3.1.3"
   }
 }

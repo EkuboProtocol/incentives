@@ -9,7 +9,6 @@ concurrency: fund
 
 jobs:
   run:
-
     strategy:
       fail-fast: false
       matrix:

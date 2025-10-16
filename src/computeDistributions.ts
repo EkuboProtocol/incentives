@@ -397,13 +397,13 @@ INSERT INTO incentives.computed_rewards (campaign_reward_period_id, locker, salt
     console.log(
       `Finished processing period ${id} in ${
         (new Date().getTime() - processingStartTime) / 1000
-      } seconds`
+      } seconds`,
     );
   }
 
   await client.query(`COMMIT;`);
   console.log(
-    `Successfully finished processing ${rewardPeriodIds.length} periods`
+    `Successfully finished processing ${rewardPeriodIds.length} periods`,
   );
 } catch (e) {
   console.error("Encountered error", e);
