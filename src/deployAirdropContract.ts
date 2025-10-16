@@ -261,18 +261,22 @@ try {
 
   if (drops.length === 0) {
     console.log("No drops to deploy");
-    await client.end();
-    process.exit(0);
+    return;
   }
 
   console.log(`Found ${drops.length} drop(s) to deploy`);
 
+  // Build a map for efficient token lookups
+  const tokenByAddress = new Map(
+    tokens.map((t) => [BigInt(t.l2_token_address).toString(), t]),
+  );
+
   for (const dropFromDB of drops) {
     console.log(`\nProcessing drop ID ${dropFromDB.drop_id}`);
 
-    // Get token information from fetched tokens
-    const token = tokens.find(
-      (t) => BigInt(t.l2_token_address) === BigInt(dropFromDB.reward_token),
+    // Get token information from map
+    const token = tokenByAddress.get(
+      BigInt(dropFromDB.reward_token).toString(),
     );
 
     if (!token) {
