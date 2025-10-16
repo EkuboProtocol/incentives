@@ -1,6 +1,7 @@
 import { Account, RpcProvider } from "starknet";
 import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
 import TelegramBot from "node-telegram-bot-api";
+import { formatUnits } from "viem";
 
 // Environment variables for Telegram
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -9,11 +10,13 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 // Starknet deployment configuration
 const accountAddress = process.env.ACCOUNT_ADDRESS;
 const privateKey = process.env.PRIVATE_KEY;
-const provider = new RpcProvider({ nodeUrl: process.env.NODE_URL });
+const nodeUrl = process.env.NODE_URL;
 
-if (!accountAddress || !privateKey) {
-  throw new Error("Missing ACCOUNT_ADDRESS or PRIVATE_KEY");
+if (!accountAddress || !privateKey || !nodeUrl) {
+  throw new Error("Missing ACCOUNT_ADDRESS, PRIVATE_KEY, or NODE_URL");
 }
+
+const provider = new RpcProvider({ nodeUrl });
 
 const deployerAccount = new Account(provider, accountAddress, privateKey);
 
@@ -42,6 +45,13 @@ interface DropInfo {
 }
 
 /**
+ * Escapes Markdown special characters to prevent parsing errors
+ */
+function escapeMarkdown(text: string): string {
+  return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, "\\$&");
+}
+
+/**
  * Formats a number with 12 significant figures, rounded up
  */
 function formatWithSignificantFigures(
@@ -49,9 +59,11 @@ function formatWithSignificantFigures(
   decimals: number,
   sigFigs: number = 12,
 ): string {
-  const valueNum = Number(value) / Math.pow(10, decimals);
+  if (value === 0n) return "0";
 
-  if (valueNum === 0) return "0";
+  // Use viem's formatUnits to safely convert BigInt to decimal string
+  const formatted = formatUnits(value, decimals);
+  const valueNum = parseFloat(formatted);
 
   // Calculate the order of magnitude
   const magnitude = Math.floor(Math.log10(Math.abs(valueNum)));
@@ -59,11 +71,9 @@ function formatWithSignificantFigures(
   // Calculate decimal places needed for sigFigs significant figures
   const decimalPlaces = Math.max(0, sigFigs - magnitude - 1);
 
-  // Round up by adding a small epsilon before rounding
-  const epsilon = Math.pow(10, -(decimalPlaces + 1));
-  const rounded =
-    Math.ceil((valueNum + epsilon) * Math.pow(10, decimalPlaces)) /
-    Math.pow(10, decimalPlaces);
+  // Round up
+  const multiplier = Math.pow(10, decimalPlaces);
+  const rounded = Math.ceil(valueNum * multiplier) / multiplier;
 
   // Format with thousand separators
   return rounded.toLocaleString("en-US", {
@@ -106,10 +116,15 @@ async function sendTelegramMessage(
   const medianAmount = calculateMedian(amounts);
   const maxAmount = amounts.reduce((max, a) => (a > max ? a : max), 0n);
 
+  // Escape campaign names to prevent Markdown parsing issues
+  const escapedCampaigns = dropInfo.campaign_names
+    .map(escapeMarkdown)
+    .join(", ");
+
   const message = `
 🎉 *Airdrop Contract Deployed*
 
-*Campaign(s):* ${dropInfo.campaign_names.join(", ")}
+*Campaign(s):* ${escapedCampaigns}
 
 *Drop Period:*
 Start: ${dropInfo.min_start_time.toISOString()}
@@ -145,6 +160,39 @@ End: ${dropInfo.max_end_time.toISOString()}
 const client = await initializeIncentivesClient();
 
 try {
+  // First, check for drops with multiple tokens and throw an error if any exist
+  const { rows: multiTokenDrops } = await client.query<{
+    drop_id: string;
+    num_tokens: number;
+    token_list: string[];
+  }>({
+    text: `
+      SELECT
+        gd.id::text AS drop_id,
+        COUNT(DISTINCT c.reward_token) AS num_tokens,
+        ARRAY_AGG(DISTINCT c.reward_token::text) AS token_list
+      FROM incentives.generated_drop gd
+      JOIN incentives.generated_drop_reward_periods gdrp ON gd.id = gdrp.drop_id
+      JOIN incentives.campaign_reward_periods crp ON gdrp.campaign_reward_period_id = crp.id
+      JOIN incentives.campaigns c ON crp.campaign_id = c.id
+      WHERE gd.id NOT IN (SELECT drop_id FROM incentives.deployed_airdrop_contracts)
+      GROUP BY gd.id
+      HAVING COUNT(DISTINCT c.reward_token) > 1
+    `,
+  });
+
+  if (multiTokenDrops.length > 0) {
+    const dropDetails = multiTokenDrops
+      .map(
+        (d) =>
+          `Drop ID ${d.drop_id}: ${d.num_tokens} tokens (${d.token_list.join(", ")})`,
+      )
+      .join("\n");
+    throw new Error(
+      `Found generated drops with multiple reward tokens:\n${dropDetails}`,
+    );
+  }
+
   // Query for all generated drops that haven't been deployed yet
   const { rows: drops } = await client.query<DropInfo>({
     text: `
@@ -186,7 +234,6 @@ try {
         da.amounts::text[]
       FROM drop_info di
       JOIN drop_amounts da ON di.drop_id = da.drop_id
-      WHERE ARRAY_LENGTH(di.reward_tokens, 1) = 1
       ORDER BY di.drop_id
     `,
   });
