@@ -70,7 +70,8 @@ function formatWithSignificantFigures(
   const magnitude = Math.floor(Math.log10(Math.abs(valueNum)));
 
   // Calculate decimal places needed for sigFigs significant figures
-  const decimalPlaces = Math.max(0, sigFigs - magnitude - 1);
+  // Clamp to 0-20 to avoid RangeError in toLocaleString
+  const decimalPlaces = Math.min(20, Math.max(0, sigFigs - magnitude - 1));
 
   // Round up
   const multiplier = Math.pow(10, decimalPlaces);
