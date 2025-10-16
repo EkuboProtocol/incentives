@@ -28,19 +28,22 @@ if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
   telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
 }
 
-interface DropInfo {
+interface DropInfoFromDB {
   drop_id: string;
   root: string;
   reward_token: string;
-  token_symbol: string;
-  token_decimals: number;
   campaign_names: string[];
-  min_start_time: Date;
-  max_end_time: Date;
+  min_start_time: Date | string;
+  max_end_time: Date | string;
   drop_total_amount: string;
   period_total_amount: string;
   num_addresses: number;
   amounts: string[];
+}
+
+interface DropInfo extends DropInfoFromDB {
+  token_symbol: string;
+  token_decimals: number;
 }
 
 /**
@@ -122,14 +125,24 @@ async function sendTelegramMessage(
     .map(escapeMarkdownV2)
     .join(", ");
 
+  // Convert dates to Date objects if they're strings (pg returns timestamptz as strings)
+  const startDate =
+    dropInfo.min_start_time instanceof Date
+      ? dropInfo.min_start_time
+      : new Date(dropInfo.min_start_time);
+  const endDate =
+    dropInfo.max_end_time instanceof Date
+      ? dropInfo.max_end_time
+      : new Date(dropInfo.max_end_time);
+
   const message = `
 🎉 *Airdrop Contract Deployed*
 
 *Campaign\\(s\\):* ${escapedCampaigns}
 
 *Drop Period:*
-Start: \`${dropInfo.min_start_time.toISOString()}\`
-End: \`${dropInfo.max_end_time.toISOString()}\`
+Start: \`${startDate.toISOString()}\`
+End: \`${endDate.toISOString()}\`
 
 *Contract Address:*
 \`${contractAddress}\`
@@ -195,7 +208,7 @@ try {
   }
 
   // Query for all generated drops that haven't been deployed yet
-  const { rows: drops } = await client.query<DropInfo>({
+  const { rows: drops } = await client.query<DropInfoFromDB>({
     text: `
       WITH drop_info AS (
         SELECT
@@ -257,17 +270,21 @@ try {
     },
   };
 
-  for (const drop of drops) {
-    console.log(`\nProcessing drop ID ${drop.drop_id}`);
+  for (const dropFromDB of drops) {
+    console.log(`\nProcessing drop ID ${dropFromDB.drop_id}`);
 
     // Validate that all periods use the same token
-    const tokenInfo = TOKEN_INFO[drop.reward_token] || {
+    const tokenInfo = TOKEN_INFO[dropFromDB.reward_token] || {
       symbol: "UNKNOWN",
       decimals: 18,
     };
 
-    drop.token_symbol = tokenInfo.symbol;
-    drop.token_decimals = tokenInfo.decimals;
+    // Create enriched drop info with token metadata
+    const drop: DropInfo = {
+      ...dropFromDB,
+      token_symbol: tokenInfo.symbol,
+      token_decimals: tokenInfo.decimals,
+    };
 
     const root = BigInt(drop.root);
     const distributedToken = BigInt(drop.reward_token);
