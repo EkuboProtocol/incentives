@@ -1,5 +1,6 @@
 #!/bin/bash
 
-# No formatters or linters are configured in this project
-# This script is intentionally minimal to avoid introducing unrelated changes
-exit 0
+# No formatters or linters are currently configured in this project
+# This script will opportunistically run format/lint scripts if they are added in the future
+npm run format --if-present
+npm run lint:fix --if-present
