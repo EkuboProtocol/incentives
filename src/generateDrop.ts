@@ -15,13 +15,13 @@ const airdropContractOptions =
 if (!airdropContractOptions) {
   throw new Error(
     `NETWORK_TYPE must be one of ${Object.keys(
-      AIRDROP_CONTRACT_OPTIONS_BY_NETWORK_TYPE
-    ).join(", ")}`
+      AIRDROP_CONTRACT_OPTIONS_BY_NETWORK_TYPE,
+    ).join(", ")}`,
   );
 }
 
 const POSITIONS_LOCKER_ADDRESS = BigInt(
-  process.env.POSITIONS_LOCKER_ADDRESS ?? 0
+  process.env.POSITIONS_LOCKER_ADDRESS ?? 0,
 );
 
 if (!POSITIONS_LOCKER_ADDRESS) {
@@ -125,7 +125,7 @@ try {
     last_end_time,
   } of pendingDrops) {
     console.log(
-      `Computing drop for ${slug} for periods between ${first_start_time} to ${last_end_time}`
+      `Computing drop for ${slug} for periods between ${first_start_time} to ${last_end_time}`,
     );
 
     const { rows: rewardsRaw } = await client.query<{
@@ -216,7 +216,7 @@ try {
           return memo;
         }
       },
-      { amount: 0n, count: 0 }
+      { amount: 0n, count: 0 },
     );
 
     const amounts: Allocation[] = rewardsRaw
@@ -231,8 +231,8 @@ try {
     if (amounts.length === 0) {
       console.log(
         `No allocations met the threshold for the following periods: ${period_ids.join(
-          ", "
-        )}`
+          ", ",
+        )}`,
       );
       continue;
     }
@@ -243,7 +243,7 @@ try {
       client,
       amounts,
       period_ids,
-      airdropContractOptions
+      airdropContractOptions,
     );
 
     console.log("Campaign: ", slug);

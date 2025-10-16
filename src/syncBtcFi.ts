@@ -9,10 +9,10 @@ const campaignSlug = process.env.CAMPAIGN_SLUG || "btcfi_season";
 const [ekuboIncentivesData, tokens] = await Promise.all([
   fetchEkuboBtcFiData(
     process.env.BTC_FI_INCENTIVES_URL ||
-      "https://www.data-openblocklabs.com/starknet/dex-incentives/ekubo"
+      "https://www.data-openblocklabs.com/starknet/dex-incentives/ekubo",
   ),
   fetchTokens(
-    process.env.TOKENS_URL || "https://starknet-mainnet-api.ekubo.org/tokens"
+    process.env.TOKENS_URL || "https://starknet-mainnet-api.ekubo.org/tokens",
   ),
 ]);
 
@@ -26,10 +26,10 @@ const incentiveRewardPeriodRowData = ekuboIncentivesData.items
   .map((d) => {
     try {
       const token0 = tokens.find(
-        (t) => BigInt(t.l2_token_address) === BigInt(d.token0_address)
+        (t) => BigInt(t.l2_token_address) === BigInt(d.token0_address),
       );
       const token1 = tokens.find(
-        (t) => BigInt(t.l2_token_address) === BigInt(d.token1_address)
+        (t) => BigInt(t.l2_token_address) === BigInt(d.token1_address),
       );
 
       if (!token0) throw new Error(`Token not found: ${d.token0_symbol}`);
@@ -43,10 +43,10 @@ const incentiveRewardPeriodRowData = ekuboIncentivesData.items
       const endDate = new Date(startDate.getTime() + 86_400_000);
       const realizedVolatility = d.realized_volatility;
       const token0RewardAmount = BigInt(
-        floatToRawValue(d.token0_allocation, strkToken.decimals)
+        floatToRawValue(d.token0_allocation, strkToken.decimals),
       );
       const token1RewardAmount = BigInt(
-        floatToRawValue(d.token1_allocation, strkToken.decimals)
+        floatToRawValue(d.token1_allocation, strkToken.decimals),
       );
 
       return {
@@ -100,8 +100,8 @@ try {
               token1RewardAmount,
             }) =>
               `(${campaign.id}, ${BigInt(token0.l2_token_address)}, ${BigInt(
-                token1.l2_token_address
-              )}, '${startDate.toISOString()}', '${endDate.toISOString()}', ${realizedVolatility}, ${token0RewardAmount}, ${token1RewardAmount}, null)`
+                token1.l2_token_address,
+              )}, '${startDate.toISOString()}', '${endDate.toISOString()}', ${realizedVolatility}, ${token0RewardAmount}, ${token1RewardAmount}, null)`,
           )
           .join(",\n")}
         ON CONFLICT (campaign_id, token0, token1, start_time, end_time)

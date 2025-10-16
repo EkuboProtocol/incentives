@@ -15,11 +15,11 @@ import { mainnet, sepolia } from "viem/chains";
 const owner = checksumAddress(toHex(BigInt(process.env.OWNER), { size: 20 }));
 
 const incentivesAddress = checksumAddress(
-  toHex(BigInt(process.env.INCENTIVES_ADDRESS), { size: 20 })
+  toHex(BigInt(process.env.INCENTIVES_ADDRESS), { size: 20 }),
 );
 
 const account = privateKeyToAccount(
-  toHex(BigInt(process.env.PRIVATE_KEY), { size: 32 })
+  toHex(BigInt(process.env.PRIVATE_KEY), { size: 32 }),
 );
 
 const rpcUrl = process.env.RPC_URL;
@@ -30,7 +30,7 @@ const chains = [
   { id: 11155111, config: sepolia },
 ];
 const chainIndex = chains.findIndex(
-  (c) => c.id === Number(process.env.CHAIN_ID)
+  (c) => c.id === Number(process.env.CHAIN_ID),
 );
 if (chainIndex === -1) {
   throw new Error("Unsupported CHAIN ID");
@@ -103,18 +103,18 @@ try {
                 owner: owner,
                 root: toHex(BigInt(row.root), { size: 32 }),
                 token: checksumAddress(
-                  toHex(BigInt(row.reward_token), { size: 20 })
+                  toHex(BigInt(row.reward_token), { size: 20 }),
                 ),
               },
               BigInt(row.total_amount),
             ],
-          })
+          }),
         ),
       ],
     });
 
     console.log(
-      `Funded in transaction hash ${fundTransactionHash}: https://etherscan.io/tx/${fundTransactionHash}`
+      `Funded in transaction hash ${fundTransactionHash}: https://etherscan.io/tx/${fundTransactionHash}`,
     );
   }
 } finally {
