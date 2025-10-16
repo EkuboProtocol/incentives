@@ -4,3 +4,4 @@
 # This script will opportunistically run format/lint scripts if they are added in the future
 npm run format --if-present
 npm run lint:fix --if-present
+npm run fix --if-present
