@@ -1,7 +1,6 @@
 import { Account, RpcProvider } from "starknet";
 import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
 import TelegramBot from "node-telegram-bot-api";
-import { formatUnits } from "viem";
 
 // Environment variables for Telegram
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -61,9 +60,8 @@ function formatWithSignificantFigures(
 ): string {
   if (value === 0n) return "0";
 
-  // Use viem's formatUnits to safely convert BigInt to decimal string
-  const formatted = formatUnits(value, decimals);
-  const valueNum = parseFloat(formatted);
+  // Convert BigInt to number with decimals
+  const valueNum = Number(value) / Math.pow(10, decimals);
 
   // Calculate the order of magnitude
   const magnitude = Math.floor(Math.log10(Math.abs(valueNum)));
