@@ -99,9 +99,9 @@ async function sendTelegramMessage(
     return;
   }
 
-  // Statistics are computed in SQL
-  const avgAmount = BigInt(Math.floor(Number(dropInfo.avg_amount)));
-  const medianAmount = BigInt(Math.floor(Number(dropInfo.median_amount)));
+  // Statistics are computed in SQL (avg and median are numeric, max is already bigint)
+  const avgAmount = BigInt(dropInfo.avg_amount.split(".")[0]);
+  const medianAmount = BigInt(dropInfo.median_amount.split(".")[0]);
   const maxAmount = BigInt(dropInfo.max_amount);
 
   // Escape campaign names to prevent MarkdownV2 parsing issues
@@ -221,7 +221,7 @@ try {
           SUM(amount) AS drop_total_amount,
           COUNT(*) AS num_addresses,
           AVG(amount) AS avg_amount,
-          PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount) AS median_amount,
+          PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount DESC) AS median_amount,
           MAX(amount) AS max_amount
         FROM incentives.generated_drop_proof
         GROUP BY drop_id
