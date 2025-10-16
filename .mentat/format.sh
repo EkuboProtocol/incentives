@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# No formatters or linters are currently configured in this project
-# This script will opportunistically run format/lint scripts if they are added in the future
+# This script runs formatters and autofix linters before commits
+# Currently configured: Prettier for code formatting
 npm run format --if-present
 npm run lint:fix --if-present
 npm run fix --if-present

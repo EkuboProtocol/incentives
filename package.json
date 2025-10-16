@@ -9,8 +9,8 @@
     "generate-drop": "tsx src/generateDrop.ts",
     "fund-drops": "tsx src/fundDrops.ts",
     "test": "vitest",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format": "prettier --write '**/*.{js,ts,tsx,json,md,yml,yaml}'",
+    "format:check": "prettier --check '**/*.{js,ts,tsx,json,md,yml,yaml}'"
   },
   "author": "Moody Salem",
   "type": "module",
