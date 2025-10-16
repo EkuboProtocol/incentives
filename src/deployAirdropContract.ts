@@ -136,7 +136,7 @@ End: \`${dropInfo.max_end_time.toISOString()}\`
 *Contract Address:*
 \`${contractAddress}\`
 
-*Token:* ${dropInfo.token_symbol}
+*Token:* ${escapeMarkdownV2(dropInfo.token_symbol)}
 
 *Drop Amount:* \`${formatWithSignificantFigures(BigInt(dropInfo.drop_total_amount), dropInfo.token_decimals)} ${dropInfo.token_symbol}\`
 
