@@ -39,7 +39,9 @@ interface DropInfoFromDB {
   drop_total_amount: string;
   period_total_amount: string;
   num_addresses: number;
-  amounts: string[];
+  avg_amount: string;
+  median_amount: string;
+  max_amount: string;
 }
 
 interface DropInfo extends DropInfoFromDB {
@@ -86,24 +88,6 @@ function formatWithSignificantFigures(
 }
 
 /**
- * Calculates median from a sorted array of bigint amounts (assumes DESC order from SQL)
- */
-function calculateMedian(sortedAmountsDesc: bigint[]): bigint {
-  if (sortedAmountsDesc.length === 0) return 0n;
-
-  const mid = Math.floor(sortedAmountsDesc.length / 2);
-
-  if (sortedAmountsDesc.length % 2 === 0) {
-    // For even length, average the two middle elements
-    // Note: array is DESC, so we need the elements at mid-1 and mid
-    return (sortedAmountsDesc[mid - 1] + sortedAmountsDesc[mid]) / 2n;
-  } else {
-    // For odd length, return the middle element
-    return sortedAmountsDesc[mid];
-  }
-}
-
-/**
  * Sends a Telegram message about the deployed contract
  */
 async function sendTelegramMessage(
@@ -115,12 +99,10 @@ async function sendTelegramMessage(
     return;
   }
 
-  // Amounts are already sorted DESC from SQL query
-  const amounts = dropInfo.amounts.map((a) => BigInt(a));
-  const avgAmount =
-    amounts.reduce((sum, a) => sum + a, 0n) / BigInt(amounts.length);
-  const medianAmount = calculateMedian(amounts);
-  const maxAmount = amounts[0]; // First element is max since sorted DESC
+  // Statistics are computed in SQL
+  const avgAmount = BigInt(Math.floor(Number(dropInfo.avg_amount)));
+  const medianAmount = BigInt(Math.floor(Number(dropInfo.median_amount)));
+  const maxAmount = BigInt(dropInfo.max_amount);
 
   // Escape campaign names to prevent MarkdownV2 parsing issues
   const escapedCampaigns = dropInfo.campaign_names
@@ -238,7 +220,9 @@ try {
           drop_id,
           SUM(amount) AS drop_total_amount,
           COUNT(*) AS num_addresses,
-          ARRAY_AGG(amount ORDER BY amount DESC) AS amounts
+          AVG(amount) AS avg_amount,
+          PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount) AS median_amount,
+          MAX(amount) AS max_amount
         FROM incentives.generated_drop_proof
         GROUP BY drop_id
       )
@@ -252,7 +236,9 @@ try {
         da.drop_total_amount::text,
         di.period_total_amount::text,
         da.num_addresses::int,
-        da.amounts::text[]
+        da.avg_amount::text,
+        da.median_amount::text,
+        da.max_amount::text
       FROM drop_info di
       JOIN drop_amounts da ON di.drop_id = da.drop_id
       ORDER BY di.drop_id
