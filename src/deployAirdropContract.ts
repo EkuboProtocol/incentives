@@ -26,7 +26,7 @@ const airdropClassHash =
 // Initialize Telegram bot if credentials are provided
 let telegramBot: TelegramBot | null = null;
 if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
-  telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN);
+  telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
 }
 
 interface DropInfo {
@@ -45,9 +45,9 @@ interface DropInfo {
 }
 
 /**
- * Escapes Markdown special characters to prevent parsing errors
+ * Escapes MarkdownV2 special characters to prevent parsing errors
  */
-function escapeMarkdown(text: string): string {
+function escapeMarkdownV2(text: string): string {
   return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, "\\$&");
 }
 
@@ -83,18 +83,20 @@ function formatWithSignificantFigures(
 }
 
 /**
- * Calculates median from an array of bigint amounts
+ * Calculates median from a sorted array of bigint amounts (assumes DESC order from SQL)
  */
-function calculateMedian(amounts: bigint[]): bigint {
-  if (amounts.length === 0) return 0n;
+function calculateMedian(sortedAmountsDesc: bigint[]): bigint {
+  if (sortedAmountsDesc.length === 0) return 0n;
 
-  const sorted = [...amounts].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  const mid = Math.floor(sorted.length / 2);
+  const mid = Math.floor(sortedAmountsDesc.length / 2);
 
-  if (sorted.length % 2 === 0) {
-    return (sorted[mid - 1] + sorted[mid]) / 2n;
+  if (sortedAmountsDesc.length % 2 === 0) {
+    // For even length, average the two middle elements
+    // Note: array is DESC, so we need the elements at mid-1 and mid
+    return (sortedAmountsDesc[mid - 1] + sortedAmountsDesc[mid]) / 2n;
   } else {
-    return sorted[mid];
+    // For odd length, return the middle element
+    return sortedAmountsDesc[mid];
   }
 }
 
@@ -110,15 +112,16 @@ async function sendTelegramMessage(
     return;
   }
 
+  // Amounts are already sorted DESC from SQL query
   const amounts = dropInfo.amounts.map((a) => BigInt(a));
   const avgAmount =
     amounts.reduce((sum, a) => sum + a, 0n) / BigInt(amounts.length);
   const medianAmount = calculateMedian(amounts);
-  const maxAmount = amounts.reduce((max, a) => (a > max ? a : max), 0n);
+  const maxAmount = amounts[0]; // First element is max since sorted DESC
 
-  // Escape campaign names to prevent Markdown parsing issues
+  // Escape campaign names to prevent MarkdownV2 parsing issues
   const escapedCampaigns = dropInfo.campaign_names
-    .map(escapeMarkdown)
+    .map(escapeMarkdownV2)
     .join(", ");
 
   const message = `
@@ -149,7 +152,7 @@ End: ${dropInfo.max_end_time.toISOString()}
 
   try {
     await telegramBot.sendMessage(TELEGRAM_CHAT_ID, message, {
-      parse_mode: "Markdown",
+      parse_mode: "MarkdownV2",
     });
     console.log("Telegram message sent successfully");
   } catch (error) {
