@@ -247,7 +247,7 @@ try {
 
   if (drops.length === 0) {
     console.log("No drops to deploy");
-    return;
+    process.exit(0);
   }
 
   console.log(`Found ${drops.length} drop(s) to deploy`);
