@@ -45,7 +45,7 @@ export async function uploadCsvToTelegram(
   }
 
   try {
-    const bot = new TelegramBot(botToken);
+    const bot = new TelegramBot(botToken, { polling: false });
 
     const csv = generateCsv(allocations);
     const buffer = Buffer.from(csv, "utf-8");
@@ -53,21 +53,28 @@ export async function uploadCsvToTelegram(
     const sum = allocations.reduce((memo, { amount }) => memo + amount, 0n);
     const formattedSum = Number(sum) / 1e18;
 
+    // Truncate period IDs if too many to avoid exceeding Telegram's 1024 char caption limit
+    const maxPeriods = 10;
+    const periodsList =
+      dropInfo.periodIds.length > maxPeriods
+        ? `${dropInfo.periodIds.slice(0, maxPeriods).join(", ")} (+${dropInfo.periodIds.length - maxPeriods} more)`
+        : dropInfo.periodIds.join(", ");
+
     const caption = [
-      `📊 **Drop Generated**`,
+      `📊 Drop Generated`,
       ``,
-      `**Campaign:** ${dropInfo.slug}`,
-      `**Database:** ${dropInfo.database}`,
-      `**Network:** ${dropInfo.networkType}`,
-      `**Drop ID:** ${dropInfo.dropId}`,
-      `**Periods:** ${dropInfo.periodIds.join(", ")}`,
-      `**Period Range:** ${dropInfo.firstStartTime.toISOString()} to ${dropInfo.lastEndTime.toISOString()}`,
+      `Campaign: ${dropInfo.slug}`,
+      `Database: ${dropInfo.database}`,
+      `Network: ${dropInfo.networkType}`,
+      `Drop ID: ${dropInfo.dropId}`,
+      `Periods: ${periodsList}`,
+      `Period Range: ${dropInfo.firstStartTime.toISOString()} to ${dropInfo.lastEndTime.toISOString()}`,
       ``,
-      `**Total Amount:** ${formattedSum.toLocaleString()} tokens`,
-      `**Recipients:** ${allocations.length.toLocaleString()}`,
-      `**Minimum Allocation:** ${Number(dropInfo.minimumAllocation) / 1e18}`,
+      `Total Amount: ${formattedSum.toLocaleString()} tokens`,
+      `Recipients: ${allocations.length.toLocaleString()}`,
+      `Minimum Allocation: ${Number(dropInfo.minimumAllocation) / 1e18}`,
       ``,
-      `**Filtered Out:**`,
+      `Filtered Out:`,
       `  - Count: ${dropInfo.filteredStats.count.toLocaleString()}`,
       `  - Amount: ${(Number(dropInfo.filteredStats.amount) / 1e18).toLocaleString()} tokens`,
     ].join("\n");
@@ -79,7 +86,6 @@ export async function uploadCsvToTelegram(
       buffer,
       {
         caption,
-        parse_mode: "Markdown",
       },
       {
         filename,
