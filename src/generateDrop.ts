@@ -3,6 +3,7 @@ import { generateAndInsertDrop } from "./util/generateAndInsertDrop.js";
 import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
 import { EVM_AIRDROP_CONTRACT_OPTIONS } from "./util/evmAirdropContract.js";
 import { STARKNET_AIRDROP_CONTRACT_OPTIONS } from "./util/starknetAirdropContract.js";
+import { uploadCsvToTelegram } from "./util/telegramCsvUpload.js";
 
 const AIRDROP_CONTRACT_OPTIONS_BY_NETWORK_TYPE = {
   STARKNET: STARKNET_AIRDROP_CONTRACT_OPTIONS,
@@ -27,6 +28,9 @@ const POSITIONS_LOCKER_ADDRESS = BigInt(
 if (!POSITIONS_LOCKER_ADDRESS) {
   throw new Error(`Missing "POSITIONS_LOCKER_ADDRESS" env variable`);
 }
+
+const DATABASE = process.env.PGDATABASE ?? "unknown";
+const NETWORK_TYPE = process.env.NETWORK_TYPE ?? "unknown";
 
 const client = await initializeIncentivesClient();
 
@@ -255,6 +259,18 @@ try {
     console.log("Minimum allocation: ", Number(minimumAllocation) / 1e18);
     console.log("Filtered out: ", filteredStats);
     console.log("Formatted amount: ", Number(sum) / 1e18);
+
+    await uploadCsvToTelegram(amounts, {
+      slug,
+      dropId,
+      periodIds: period_ids,
+      firstStartTime: first_start_time,
+      lastEndTime: last_end_time,
+      minimumAllocation,
+      filteredStats,
+      database: DATABASE,
+      networkType: NETWORK_TYPE,
+    });
   }
 
   await client.query("COMMIT;");

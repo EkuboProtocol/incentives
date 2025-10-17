@@ -46,12 +46,58 @@ npm run deploy-airdrop-contract
 
 The workflow can be triggered manually via GitHub Actions. It will automatically deploy all pending drops and send Telegram notifications.
 
+### Generate Drop (`generateDrop.ts`)
+
+Generates merkle drops from computed rewards and optionally uploads CSV files to Telegram.
+
+**Features:**
+
+- Queries pending drops from computed reward periods
+- Generates merkle trees and proofs for each drop
+- Filters allocations based on minimum thresholds
+- Uploads CSV files with allocation data to Telegram (optional)
+
+**Environment Variables:**
+
+- `NETWORK_TYPE` - Network type: `STARKNET` or `EVM` (required)
+- `POSITIONS_LOCKER_ADDRESS` - Address of the positions locker contract (required)
+- `TELEGRAM_BOT_TOKEN` - Telegram bot token for CSV uploads (optional)
+- `TELEGRAM_CHAT_ID` - Telegram chat ID to send CSV files to (optional)
+- Database connection variables: `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`
+
+**Telegram CSV Upload:**
+
+When `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are configured, the script automatically uploads a CSV file for each generated drop containing:
+
+- **CSV Columns:**
+  - `address` - Recipient address (raw bigint)
+  - `amount` - Token amount (raw bigint)
+  - `amount_formatted` - Token amount divided by 1e18 for readability
+
+- **Message Caption includes:**
+  - Campaign slug
+  - Database and network type
+  - Drop ID and reward period IDs
+  - Period date range
+  - Total amount and number of recipients
+  - Minimum allocation threshold
+  - Statistics on filtered allocations
+
+**Usage:**
+
+```bash
+npm run generate-drop
+```
+
+**GitHub Actions:**
+
+The workflow runs daily at 12:00 UTC and can be triggered manually. It processes drops for all configured networks (Ethereum mainnet/sepolia and Starknet mainnet/sepolia).
+
 ### Other Scripts
 
 - `sync-defi-spring` - Syncs DeFi Spring campaign data
 - `sync-btcfi` - Syncs BTC-Fi campaign data
 - `compute-distributions` - Computes reward distributions
-- `generate-drop` - Generates merkle drops from computed rewards
 - `fund-drops` - Funds deployed airdrop contracts
 
 ## Development

@@ -50,4 +50,6 @@ jobs:
           PGDATABASE: ${{ matrix.database }}
           NETWORK_TYPE: ${{ matrix.network_type }}
           POSITIONS_LOCKER_ADDRESS: ${{ matrix.positions_locker_address }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: npm run generate-drop
