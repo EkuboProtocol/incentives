@@ -32,11 +32,10 @@ const telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, {
 
 try {
   const me = await telegramBot.getMe();
-  const chat = await telegramBot.getChat(TELEGRAM_CHAT_ID);
   const member = await telegramBot.getChatMember(TELEGRAM_CHAT_ID, me.id);
 
-  if (chat.type !== "channel" || member.status !== "member") {
-    throw new Error("Bot is not a member of this chat");
+  if (member.status !== "member") {
+    throw new Error("Bot is not a member of the given TELEGRAM_CHAT_ID");
   }
 } catch (e) {
   throw new Error(
