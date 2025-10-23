@@ -153,14 +153,9 @@ End: \`${endDate.toISOString()}\`
 • Maximum: \`${formatWithSignificantFigures(maxAmount, dropInfo.token_decimals)} ${dropInfo.token_symbol}\`
   `.trim();
 
-  try {
-    await telegramBot.sendMessage(TELEGRAM_CHAT_ID, message, {
-      parse_mode: "MarkdownV2",
-    });
-    console.log("Telegram message sent successfully");
-  } catch (error) {
-    console.error("Failed to send Telegram message:", error);
-  }
+  await telegramBot.sendMessage(TELEGRAM_CHAT_ID, message, {
+    parse_mode: "MarkdownV2",
+  });
 }
 
 // Fetch token metadata from API
@@ -324,7 +319,7 @@ try {
 
     console.log("Inserted airdrop row");
 
-    // Send Telegram message
+    // Must send telegram message before inserting the row
     await sendTelegramMessage(drop, deployResponse.contract_address);
 
     console.log(`Successfully deployed drop ID ${drop.drop_id}`);
