@@ -31,6 +31,11 @@ const telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, {
   polling: false,
 });
 
+const chat = await telegramBot.getChat(TELEGRAM_CHAT_ID);
+if (!chat?.permissions?.can_send_messages) {
+  throw new Error(`Cannot send messages to the chat ID ${TELEGRAM_CHAT_ID}`);
+}
+
 interface DropInfoFromDB {
   drop_id: string;
   root: string;
