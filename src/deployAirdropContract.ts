@@ -5,7 +5,7 @@ import { fetchTokens } from "./util/tokens.js";
 
 // Environment variables for Telegram
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = parseInt(process.env.TELEGRAM_CHAT_ID);
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 // Starknet deployment configuration
 const accountAddress = process.env.ACCOUNT_ADDRESS;
@@ -13,7 +13,6 @@ const privateKey = process.env.PRIVATE_KEY;
 const nodeUrl = process.env.NODE_URL;
 
 if (!TELEGRAM_BOT_TOKEN) throw new Error("Missing TELEGRAM_BOT_TOKEN");
-if (isNaN(TELEGRAM_CHAT_ID)) throw new Error("Invalid TELEGRAM_CHAT_ID");
 
 if (!accountAddress || !privateKey || !nodeUrl) {
   throw new Error("Missing ACCOUNT_ADDRESS, PRIVATE_KEY, or NODE_URL");
@@ -32,9 +31,12 @@ const telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, {
 });
 
 try {
+  const me = await telegramBot.getMe();
   const chat = await telegramBot.getChat(TELEGRAM_CHAT_ID);
-  if (!chat.permissions?.can_send_messages) {
-    throw new Error(`Cannot send messages to the chat ID ${TELEGRAM_CHAT_ID}`);
+  const member = await telegramBot.getChatMember(TELEGRAM_CHAT_ID, me.id);
+
+  if (chat.type !== "channel" || member.status !== "member") {
+    throw new Error("Bot is not a member of this chat");
   }
 } catch (e) {
   throw new Error(
