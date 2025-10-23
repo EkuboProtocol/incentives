@@ -5,12 +5,15 @@ import { fetchTokens } from "./util/tokens.js";
 
 // Environment variables for Telegram
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const TELEGRAM_CHAT_ID = parseInt(process.env.TELEGRAM_CHAT_ID);
 
 // Starknet deployment configuration
 const accountAddress = process.env.ACCOUNT_ADDRESS;
 const privateKey = process.env.PRIVATE_KEY;
 const nodeUrl = process.env.NODE_URL;
+
+if (!TELEGRAM_BOT_TOKEN) throw new Error("Missing TELEGRAM_BOT_TOKEN");
+if (isNaN(TELEGRAM_CHAT_ID)) throw new Error("Invalid TELEGRAM_CHAT_ID");
 
 if (!accountAddress || !privateKey || !nodeUrl) {
   throw new Error("Missing ACCOUNT_ADDRESS, PRIVATE_KEY, or NODE_URL");
