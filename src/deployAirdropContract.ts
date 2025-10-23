@@ -27,10 +27,9 @@ const airdropClassHash =
   "0x01cb5e128a81be492ee7b78cf4ba4849cb35f311508e13a558755f4549839f14";
 
 // Initialize Telegram bot if credentials are provided
-let telegramBot: TelegramBot | null = null;
-if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
-  telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
-}
+const telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, {
+  polling: false,
+});
 
 interface DropInfoFromDB {
   drop_id: string;
@@ -97,11 +96,6 @@ async function sendTelegramMessage(
   dropInfo: DropInfo,
   contractAddress: string,
 ): Promise<void> {
-  if (!telegramBot || !TELEGRAM_CHAT_ID) {
-    console.log("Telegram not configured, skipping message");
-    return;
-  }
-
   // Statistics are computed in SQL (avg and median are numeric, max is already bigint)
   const avgAmount = BigInt(dropInfo.avg_amount.split(".")[0]);
   const medianAmount = BigInt(dropInfo.median_amount.split(".")[0]);
