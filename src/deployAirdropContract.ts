@@ -129,26 +129,16 @@ async function sendTelegramMessage(
       : new Date(dropInfo.max_end_time);
 
   const message = `
-🎉 *Airdrop Contract Deployed*
+*Deployed Airdrop for Campaign\\(s\\):* ${escapedCampaigns}
 
-*Campaign\\(s\\):* ${escapedCampaigns}
-
-*Drop Period:*
-Start: \`${startDate.toISOString()}\`
-End: \`${endDate.toISOString()}\`
-
-*Contract Address:*
-\`${contractAddress}\`
-
-*Token:* ${escapeMarkdownV2(dropInfo.token_symbol)}
+*Drop Period:* \`${startDate.toISOString()}\` to \`${endDate.toISOString()}\`
+*Contract Address:* \`${contractAddress}\`
 
 *Drop Amount:* \`${formatWithSignificantFigures(BigInt(dropInfo.drop_total_amount), dropInfo.token_decimals)} ${dropInfo.token_symbol}\`
-
-*Campaign Total:* \`${formatWithSignificantFigures(BigInt(dropInfo.period_total_amount), dropInfo.token_decimals)} ${dropInfo.token_symbol}\`
-
-*Recipients:* \`${dropInfo.num_addresses.toLocaleString()}\`
+*Period Total:* \`${formatWithSignificantFigures(BigInt(dropInfo.period_total_amount), dropInfo.token_decimals)} ${dropInfo.token_symbol}\`
 
 *Reward Statistics:*
+• Number of recipients: \`${dropInfo.num_addresses.toLocaleString()}\`
 • Average: \`${formatWithSignificantFigures(avgAmount, dropInfo.token_decimals)} ${dropInfo.token_symbol}\`
 • Median: \`${formatWithSignificantFigures(medianAmount, dropInfo.token_decimals)} ${dropInfo.token_symbol}\`
 • Maximum: \`${formatWithSignificantFigures(maxAmount, dropInfo.token_decimals)} ${dropInfo.token_symbol}\`
