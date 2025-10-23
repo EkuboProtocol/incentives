@@ -109,8 +109,8 @@ async function sendTelegramMessage(
   contractAddress: string,
 ): Promise<void> {
   // Statistics are computed in SQL (avg and median are numeric, max is already bigint)
-  const avgAmount = BigInt(dropInfo.avg_amount.split(".")[0]);
-  const medianAmount = BigInt(dropInfo.median_amount.split(".")[0]);
+  const avgAmount = BigInt(Math.floor(Number(dropInfo.avg_amount)));
+  const medianAmount = BigInt(Math.floor(Number(dropInfo.median_amount)));
   const maxAmount = BigInt(dropInfo.max_amount);
 
   // Escape campaign names to prevent MarkdownV2 parsing issues
