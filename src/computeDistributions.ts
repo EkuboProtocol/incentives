@@ -415,7 +415,7 @@ FROM
 	position_rewards pr,
 	period_info pi
 WHERE
-	reward_amount > 0;
+	reward_amount > 0
 );
       `,
       values: [
