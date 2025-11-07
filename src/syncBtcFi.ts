@@ -65,6 +65,21 @@ const incentiveRewardPeriodRowData = ekuboIncentivesData.items
   })
   .filter((d) => d.token0RewardAmount !== 0n || d.token1RewardAmount !== 0n);
 
+console.log(
+  incentiveRewardPeriodRowData.filter(
+    (d) => d.startDate.getTime() === new Date("2025-11-01T00:00:00Z").getTime(),
+  ),
+  // .filter(
+  //   (d, ix, list) =>
+  //     !!list.find(
+  //       (d2, ix2) =>
+  //         ix !== ix2 &&
+  //         d.token1.l2_token_address === d2.token1.l2_token_address &&
+  //         d2.token0.l2_token_address === d.token0.l2_token_address,
+  //     ),
+  // ),
+);
+
 const client = await initializeIncentivesClient();
 
 await client.query(`BEGIN;`);
