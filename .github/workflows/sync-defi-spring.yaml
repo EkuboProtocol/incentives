@@ -29,12 +29,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
-          cache: "npm"
+          bun-version: latest
 
-      - run: npm install
+      - run: bun install
 
       - name: Sync
         env:
@@ -50,4 +49,4 @@ jobs:
           DEFI_SPRING_INCENTIVES_URL: ${{ inputs.defi_spring_incentives_url }}
           TOKENS_URL: ${{ inputs.tokens_url }}
 
-        run: npm run sync-defi-spring
+        run: bun sync-defi-spring

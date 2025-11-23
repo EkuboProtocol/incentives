@@ -10,9 +10,7 @@ const [ekuboIncentivesData, tokens] = await Promise.all([
     process.env.DEFI_SPRING_INCENTIVES_URL ||
       "https://kx58j6x5me.execute-api.us-east-1.amazonaws.com/starknet/fetchFile?file=strk_grant.json",
   ),
-  fetchTokens(
-    process.env.TOKENS_URL || "https://starknet-mainnet-api.ekubo.org/tokens",
-  ),
+  fetchTokens(0x534e5f4d41494en),
 ]);
 
 const tokensWithStrkSymbol = tokens.filter((t) => t.symbol === "STRK");
@@ -37,12 +35,9 @@ const incentiveRewardPeriodRowData = Object.entries(
     throw new Error(`Unrecognized pair: ${pair}`);
 
   const [token0, token1] =
-    BigInt(tokenA[0].l2_token_address) < BigInt(tokenB[0].l2_token_address)
-      ? [BigInt(tokenA[0].l2_token_address), BigInt(tokenB[0].l2_token_address)]
-      : [
-          BigInt(tokenB[0].l2_token_address),
-          BigInt(tokenA[0].l2_token_address),
-        ];
+    BigInt(tokenA[0].address) < BigInt(tokenB[0].address)
+      ? [BigInt(tokenA[0].address), BigInt(tokenB[0].address)]
+      : [BigInt(tokenB[0].address), BigInt(tokenA[0].address)];
 
   return data
     .map((d) => {

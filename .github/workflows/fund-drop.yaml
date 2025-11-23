@@ -32,12 +32,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
-          cache: "npm"
+          bun-version: latest
 
-      - run: npm install
+      - run: bun install
 
       - name: Fund drop
         env:
@@ -53,4 +52,4 @@ jobs:
           CHAIN_ID: ${{ matrix.chain_id }}
           PRIVATE_KEY: ${{ secrets[matrix.private_key_secret] }}
           RPC_URL: ${{ secrets[matrix.rpc_url_secret] }}
-        run: npm run fund-drops
+        run: bun fund-drops

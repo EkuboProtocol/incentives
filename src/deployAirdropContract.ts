@@ -150,9 +150,7 @@ async function sendTelegramMessage(
 }
 
 // Fetch token metadata from API
-const tokens = await fetchTokens(
-  process.env.TOKENS_URL || "https://starknet-mainnet-api.ekubo.org/tokens",
-);
+const tokens = await fetchTokens(0x534e5f4d41494en);
 
 const client = await initializeIncentivesClient();
 
@@ -248,7 +246,7 @@ try {
 
   // Build a map for efficient token lookups
   const tokenByAddress = new Map(
-    tokens.map((t) => [BigInt(t.l2_token_address).toString(), t]),
+    tokens.map((t) => [BigInt(t.address).toString(), t]),
   );
 
   for (const dropFromDB of drops) {

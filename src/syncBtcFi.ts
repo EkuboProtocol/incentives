@@ -11,9 +11,7 @@ const [ekuboIncentivesData, tokens] = await Promise.all([
     process.env.BTC_FI_INCENTIVES_URL ||
       "https://www.data-openblocklabs.com/starknet/dex-incentives/ekubo",
   ),
-  fetchTokens(
-    process.env.TOKENS_URL || "https://starknet-mainnet-api.ekubo.org/tokens",
-  ),
+  fetchTokens(0x534e5f4d41494en),
 ]);
 
 const tokensWithStrkSymbol = tokens.filter((t) => t.symbol === "STRK");
@@ -26,16 +24,16 @@ const incentiveRewardPeriodRowData = ekuboIncentivesData.items
   .map((d) => {
     try {
       const token0 = tokens.find(
-        (t) => BigInt(t.l2_token_address) === BigInt(d.token0_address),
+        (t) => BigInt(t.address) === BigInt(d.token0_address),
       );
       const token1 = tokens.find(
-        (t) => BigInt(t.l2_token_address) === BigInt(d.token1_address),
+        (t) => BigInt(t.address) === BigInt(d.token1_address),
       );
 
       if (!token0) throw new Error(`Token not found: ${d.token0_symbol}`);
       if (!token1) throw new Error(`Token not found: ${d.token1_symbol}`);
 
-      if (BigInt(token0.l2_token_address) >= BigInt(token1.l2_token_address)) {
+      if (BigInt(token0.address) >= BigInt(token1.address)) {
         throw new Error("Invalid sort order");
       }
 
@@ -64,21 +62,6 @@ const incentiveRewardPeriodRowData = ekuboIncentivesData.items
     }
   })
   .filter((d) => d.token0RewardAmount !== 0n || d.token1RewardAmount !== 0n);
-
-console.log(
-  incentiveRewardPeriodRowData.filter(
-    (d) => d.startDate.getTime() === new Date("2025-11-01T00:00:00Z").getTime(),
-  ),
-  // .filter(
-  //   (d, ix, list) =>
-  //     !!list.find(
-  //       (d2, ix2) =>
-  //         ix !== ix2 &&
-  //         d.token1.l2_token_address === d2.token1.l2_token_address &&
-  //         d2.token0.l2_token_address === d.token0.l2_token_address,
-  //     ),
-  // ),
-);
 
 const client = await initializeIncentivesClient();
 
@@ -114,8 +97,8 @@ try {
               token0RewardAmount,
               token1RewardAmount,
             }) =>
-              `(${campaign.id}, ${BigInt(token0.l2_token_address)}, ${BigInt(
-                token1.l2_token_address,
+              `(${campaign.id}, ${BigInt(token0.address)}, ${BigInt(
+                token1.address,
               )}, '${startDate.toISOString()}', '${endDate.toISOString()}', ${realizedVolatility}, ${token0RewardAmount}, ${token1RewardAmount}, null)`,
           )
           .join(",\n")}
@@ -131,8 +114,6 @@ try {
                 ELSE incentives.campaign_reward_periods.rewards_last_computed_at
             END;
     `;
-
-  console.log("Running query", queryText);
 
   const { rowCount } = await client.query({
     text: queryText,

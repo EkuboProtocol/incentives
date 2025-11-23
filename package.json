@@ -2,18 +2,20 @@
   "name": "defi-spring",
   "version": "1.0.0",
   "scripts": {
-    "sync-defi-spring": "tsx src/syncDefiSpring.ts",
-    "sync-btcfi": "tsx src/syncBtcFi.ts",
-    "compute-distributions": "tsx src/computeDistributions.ts",
-    "deploy-airdrop-contract": "tsx src/deployAirdropContract.ts",
-    "generate-drop": "tsx src/generateDrop.ts",
-    "fund-drops": "tsx src/fundDrops.ts",
-    "test": "vitest",
+    "sync-defi-spring": "bun src/syncDefiSpring.ts",
+    "sync-btcfi": "bun src/syncBtcFi.ts",
+    "compute-distributions": "bun src/computeDistributions.ts",
+    "deploy-airdrop-contract": "bun src/deployAirdropContract.ts",
+    "generate-drop": "bun src/generateDrop.ts",
+    "fund-drops": "bun src/fundDrops.ts",
     "format": "prettier --write '**/*.{js,ts,tsx,json,md,yml,yaml}'",
     "format:check": "prettier --check '**/*.{js,ts,tsx,json,md,yml,yaml}'"
   },
   "author": "Moody Salem",
   "type": "module",
+  "engines": {
+    "bun": "^1.3.2"
+  },
   "dependencies": {
     "@types/node-telegram-bot-api": "^0.64.7",
     "@types/pg": "^8.11.2",
@@ -21,12 +23,9 @@
     "pedersen-fast": "^0.4.0",
     "pg": "^8.11.3",
     "starknet": "^7.5.1",
-    "tsx": "^4.7.1",
-    "typescript": "^5.3.3",
     "viem": "^2.30.1"
   },
   "devDependencies": {
-    "prettier": "^3.4.2",
-    "vitest": "^3.1.3"
+    "prettier": "^3.4.2"
   }
 }

@@ -13,12 +13,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
-          cache: "npm"
+          bun-version: latest
 
-      - run: npm install
+      - run: bun install
 
       - name: Deploy drop
         env:
@@ -35,4 +34,4 @@ jobs:
           NODE_URL: ${{ secrets.DEPLOYMENT_NODE_URL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: npm run deploy-airdrop-contract
+        run: bun deploy-airdrop-contract

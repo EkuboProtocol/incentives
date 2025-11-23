@@ -1,15 +1,17 @@
-interface Token {
+interface ApiToken {
+  chain_id: `0x${string}`;
   name: string;
   symbol: string;
   decimals: number;
-  l2_token_address: string;
+  address: string;
   sort_order: number;
   total_supply: number | null;
-  logo_url: string;
 }
 
-export async function fetchTokens(tokensUrl: string) {
-  const tokensResponse = await fetch(tokensUrl);
+export async function fetchTokens(chainId: bigint) {
+  const tokensResponse = await fetch(
+    `https://prod-api.ekubo.org/tokens?chainId=${chainId}`,
+  );
 
   if (!tokensResponse.ok) {
     throw new Error(
@@ -17,5 +19,5 @@ export async function fetchTokens(tokensUrl: string) {
     );
   }
 
-  return (await tokensResponse.json()) as Token[];
+  return (await tokensResponse.json()) as ApiToken[];
 }
