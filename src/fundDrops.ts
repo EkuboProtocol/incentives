@@ -1,11 +1,9 @@
 import postgres from "postgres";
 import {
   checksumAddress,
-  createPublicClient,
   createWalletClient,
   encodeFunctionData,
   http,
-  parseAbi,
   toHex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -43,16 +41,12 @@ const walletClient = createWalletClient({
   chain,
   account,
 });
-const publicClient = createPublicClient({
-  transport: http(rpcUrl),
-  chain,
-});
 
 const chainId = await walletClient.getChainId();
 
 console.log(`Funding drops for chain ID ${chainId}`);
 
-const sql = postgres();
+const sql = postgres({ types: { bigint: postgres.BigInt } });
 
 try {
   const rows = await sql<

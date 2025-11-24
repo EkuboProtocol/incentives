@@ -28,19 +28,21 @@ if (!POSITIONS_LOCKER_ADDRESS) {
   throw new Error(`Missing "POSITIONS_LOCKER_ADDRESS" env variable`);
 }
 
-const sql = postgres();
+const sql = postgres({ types: { bigint: postgres.BigInt } });
 
 try {
   await sql.begin(async (tx) => {
     await tx`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;`;
 
-    const pendingDrops = await tx<{
-      slug: string;
-      minimum_allocation: string;
-      period_ids: string[];
-      first_start_time: Date;
-      last_end_time: Date;
-    }[]>`
+    const pendingDrops = await tx<
+      {
+        slug: string;
+        minimum_allocation: string;
+        period_ids: string[];
+        first_start_time: Date | string;
+        last_end_time: Date | string;
+      }[]
+    >`
       WITH campaign_info AS (
         SELECT
           id,

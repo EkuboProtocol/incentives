@@ -152,7 +152,7 @@ async function sendTelegramMessage(
 // Fetch token metadata from API
 const tokens = await fetchTokens(0x534e5f4d41494en);
 
-const sql = postgres();
+const sql = postgres({ types: { bigint: postgres.BigInt } });
 
 try {
   // First, check for drops with multiple tokens and throw an error if any exist
