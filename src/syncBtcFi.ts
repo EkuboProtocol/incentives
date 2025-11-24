@@ -4,12 +4,11 @@ import { fetchTokens } from "./util/tokens.js";
 import { floatToRawValue } from "./util/floatToRawValue.js";
 import { fetchEkuboBtcFiData } from "./util/btcFiApi.js";
 
-const campaignSlug = process.env.CAMPAIGN_SLUG || "btcfi_season";
+const campaignSlug = "btcfi_season";
 
 const [ekuboIncentivesData, tokens] = await Promise.all([
   fetchEkuboBtcFiData(
-    process.env.BTC_FI_INCENTIVES_URL ||
-      "https://www.data-openblocklabs.com/starknet/dex-incentives/ekubo",
+    "https://www.data-openblocklabs.com/starknet/dex-incentives/ekubo",
   ),
   fetchTokens(0x534e5f4d41494en),
 ]);
@@ -63,7 +62,7 @@ const incentiveRewardPeriodRowData = ekuboIncentivesData.items
   })
   .filter((d) => d.token0RewardAmount !== 0n || d.token1RewardAmount !== 0n);
 
-const sql = postgres({ types: { bigint: postgres.BigInt } });
+const sql = postgres();
 let rowCount = 0;
 
 try {
@@ -91,12 +90,11 @@ try {
         campaign.id,
         BigInt(token0.address).toString(),
         BigInt(token1.address).toString(),
-        startDate,
-        endDate,
+        startDate.toISOString(),
+        endDate.toISOString(),
         realizedVolatility,
         token0RewardAmount.toString(),
         token1RewardAmount.toString(),
-        null,
       ],
     );
 
@@ -110,24 +108,21 @@ try {
         end_time,
         realized_volatility,
         token0_reward_amount,
-        token1_reward_amount,
-        rewards_last_computed_at
+        token1_reward_amount
       )
       VALUES ${tx(rowsToInsert)}
       ON CONFLICT (campaign_id, token0, token1, start_time, end_time)
       DO UPDATE SET
         token0_reward_amount = EXCLUDED.token0_reward_amount,
         token1_reward_amount = EXCLUDED.token1_reward_amount,
-        rewards_last_computed_at = CASE
-          WHEN (incentives.campaign_reward_periods.token0_reward_amount != EXCLUDED.token0_reward_amount
+        rewards_last_computed_at = NULL
+        WHERE 
+          (incentives.campaign_reward_periods.token0_reward_amount != EXCLUDED.token0_reward_amount
             OR incentives.campaign_reward_periods.token1_reward_amount != EXCLUDED.token1_reward_amount)
             AND incentives.campaign_reward_periods.id NOT IN (
               SELECT campaign_reward_period_id
               FROM incentives.generated_drop_reward_periods
-            )
-          THEN NULL
-          ELSE incentives.campaign_reward_periods.rewards_last_computed_at
-        END;
+            );
     `;
 
       rowCount = insertResult.count ?? insertResult.length ?? 0;

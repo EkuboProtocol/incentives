@@ -3,12 +3,11 @@ import { fetchEkuboDefiSpringData } from "./util/defiSpringApi.js";
 import { fetchTokens } from "./util/tokens.js";
 import { floatToRawValue } from "./util/floatToRawValue.js";
 
-const campaignSlug = process.env.CAMPAIGN_SLUG || "starknet_defi_spring";
+const campaignSlug = "starknet_defi_spring";
 
 const [ekuboIncentivesData, tokens] = await Promise.all([
   fetchEkuboDefiSpringData(
-    process.env.DEFI_SPRING_INCENTIVES_URL ||
-      "https://kx58j6x5me.execute-api.us-east-1.amazonaws.com/starknet/fetchFile?file=strk_grant.json",
+    "https://kx58j6x5me.execute-api.us-east-1.amazonaws.com/starknet/fetchFile?file=strk_grant.json",
   ),
   fetchTokens(0x534e5f4d41494en),
 ]);
@@ -70,7 +69,7 @@ const incentiveRewardPeriodRowData = Object.entries(
     .filter((d) => d.token0RewardAmount !== 0n || d.token1RewardAmount !== 0n);
 });
 
-const sql = postgres({ types: { bigint: postgres.BigInt } });
+const sql = postgres();
 let rowCount = 0;
 
 try {
@@ -123,16 +122,14 @@ try {
       DO UPDATE SET
         token0_reward_amount = EXCLUDED.token0_reward_amount,
         token1_reward_amount = EXCLUDED.token1_reward_amount,
-        rewards_last_computed_at = CASE
-          WHEN (incentives.campaign_reward_periods.token0_reward_amount != EXCLUDED.token0_reward_amount
+        rewards_last_computed_at = NULL
+        WHERE 
+          (incentives.campaign_reward_periods.token0_reward_amount != EXCLUDED.token0_reward_amount
             OR incentives.campaign_reward_periods.token1_reward_amount != EXCLUDED.token1_reward_amount)
             AND incentives.campaign_reward_periods.id NOT IN (
               SELECT campaign_reward_period_id
               FROM incentives.generated_drop_reward_periods
-            )
-          THEN NULL
-          ELSE incentives.campaign_reward_periods.rewards_last_computed_at
-        END;
+            );
     `;
 
       rowCount = insertResult.count ?? insertResult.length ?? 0;

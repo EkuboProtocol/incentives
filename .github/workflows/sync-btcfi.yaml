@@ -2,22 +2,7 @@ name: Sync BTCFI
 
 on:
   schedule:
-    - cron: "*/15 0-8 * * *"
-  workflow_dispatch:
-    inputs:
-      campaign_slug:
-        required: false
-        default: "btcfi_season"
-        type: "string"
-        description: "The slug of the campaign where the rewards should be entered"
-      btcfi_incentives_url:
-        required: false
-        default: "https://www.data-openblocklabs.com/starknet/dex-incentives/ekubo"
-        description: "The URL of the DeFi Spring Incentives to sync"
-      tokens_url:
-        required: false
-        default: "https://starknet-mainnet-api.ekubo.org/tokens"
-        description: "The URL of the Starknet tokens information endpoint"
+    - cron: "*/15 * * * *"
 
 concurrency: sync-defi-spring
 
@@ -45,8 +30,5 @@ jobs:
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           PGSSLMODE: require
           NODE_TLS_REJECT_UNAUTHORIZED: 0
-          CAMPAIGN_SLUG: ${{ inputs.campaign_slug }}
-          BTC_FI_INCENTIVES_URL: ${{ inputs.btcfi_incentives_url }}
-          TOKENS_URL: ${{ inputs.tokens_url }}
 
         run: bun sync-btcfi

@@ -28,7 +28,7 @@ if (!POSITIONS_LOCKER_ADDRESS) {
   throw new Error(`Missing "POSITIONS_LOCKER_ADDRESS" env variable`);
 }
 
-const sql = postgres({ types: { bigint: postgres.BigInt } });
+const sql = postgres();
 
 try {
   await sql.begin(async (tx) => {

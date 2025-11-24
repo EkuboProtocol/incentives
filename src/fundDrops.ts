@@ -52,7 +52,7 @@ const chainId = await walletClient.getChainId();
 
 console.log(`Funding drops for chain ID ${chainId}`);
 
-const sql = postgres({ types: { bigint: postgres.BigInt } });
+const sql = postgres();
 
 try {
   const rows = await sql<{
