@@ -55,11 +55,13 @@ console.log(`Funding drops for chain ID ${chainId}`);
 const sql = postgres();
 
 try {
-  const rows = await sql<{
-    root: string;
-    reward_token: string;
-    total_amount: string;
-  }>`
+  const rows = await sql<
+    {
+      root: string;
+      reward_token: string;
+      total_amount: string;
+    }[]
+  >`
             WITH drop_amounts AS
                      (SELECT drop_id,
                              SUM(amount) AS total
