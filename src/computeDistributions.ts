@@ -1,6 +1,9 @@
 import postgres from "postgres";
 
-const sql = postgres({ types: { bigint: postgres.BigInt } });
+const sql = postgres({
+  ssl: { rejectUnauthorized: false },
+  types: { bigint: postgres.BigInt },
+});
 let rewardPeriodIds: string[] = [];
 
 try {

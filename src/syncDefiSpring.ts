@@ -69,7 +69,10 @@ const incentiveRewardPeriodRowData = Object.entries(
     .filter((d) => d.token0RewardAmount !== 0n || d.token1RewardAmount !== 0n);
 });
 
-const sql = postgres({ types: { bigint: postgres.BigInt } });
+const sql = postgres({
+  ssl: { rejectUnauthorized: false },
+  types: { bigint: postgres.BigInt },
+});
 let rowCount = 0;
 
 try {
