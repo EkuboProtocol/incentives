@@ -1,4 +1,4 @@
-import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
+import postgres from "postgres";
 import { fetchEkuboDefiSpringData } from "./util/defiSpringApi.js";
 import { fetchTokens } from "./util/tokens.js";
 import { floatToRawValue } from "./util/floatToRawValue.js";
@@ -70,63 +70,78 @@ const incentiveRewardPeriodRowData = Object.entries(
     .filter((d) => d.token0RewardAmount !== 0n || d.token1RewardAmount !== 0n);
 });
 
-const client = await initializeIncentivesClient();
-
-await client.query(`BEGIN;`);
+const sql = postgres({ types: { bigint: postgres.BigInt } });
+let rowCount = 0;
 
 try {
-  const {
-    rows: [campaign],
-  } = await client.query({
-    text: `SELECT id
-               FROM incentives.campaigns
-               WHERE slug = $1`,
-    values: [campaignSlug],
+  await sql.begin(async (tx) => {
+    const [campaign] = await tx<{ id: string }[]>`
+    SELECT id
+    FROM incentives.campaigns
+    WHERE slug = ${campaignSlug}
+  `;
+
+    if (!campaign) {
+      throw new Error(`Campaign with slug ${campaignSlug} not found`);
+    }
+
+    const rowsToInsert = incentiveRewardPeriodRowData.map(
+      ({
+        token0,
+        token1,
+        startDate,
+        endDate,
+        realizedVolatility,
+        token0RewardAmount,
+        token1RewardAmount,
+      }) => [
+        campaign.id,
+        token0.toString(),
+        token1.toString(),
+        startDate.toISOString(),
+        endDate.toISOString(),
+        realizedVolatility,
+        token0RewardAmount.toString(),
+        token1RewardAmount.toString(),
+      ],
+    );
+
+    if (rowsToInsert.length > 0) {
+      const insertResult = await tx`
+      INSERT INTO incentives.campaign_reward_periods (
+        campaign_id,
+        token0,
+        token1,
+        start_time,
+        end_time,
+        realized_volatility,
+        token0_reward_amount,
+        token1_reward_amount
+      )
+      VALUES ${tx(rowsToInsert)}
+      ON CONFLICT (campaign_id, token0, token1, start_time, end_time)
+      DO UPDATE SET
+        token0_reward_amount = EXCLUDED.token0_reward_amount,
+        token1_reward_amount = EXCLUDED.token1_reward_amount,
+        rewards_last_computed_at = CASE
+          WHEN (incentives.campaign_reward_periods.token0_reward_amount != EXCLUDED.token0_reward_amount
+            OR incentives.campaign_reward_periods.token1_reward_amount != EXCLUDED.token1_reward_amount)
+            AND incentives.campaign_reward_periods.id NOT IN (
+              SELECT campaign_reward_period_id
+              FROM incentives.generated_drop_reward_periods
+            )
+          THEN NULL
+          ELSE incentives.campaign_reward_periods.rewards_last_computed_at
+        END;
+    `;
+
+      rowCount = insertResult.count ?? insertResult.length ?? 0;
+    } else {
+      rowCount = 0;
+    }
   });
-
-  if (!campaign) {
-    throw new Error(`Campaign with slug ${campaignSlug} not found`);
-  }
-
-  const { rowCount } = await client.query({
-    text: `
-        INSERT INTO incentives.campaign_reward_periods (campaign_id, token0, token1, start_time, end_time,
-                                                        realized_volatility, token0_reward_amount,
-                                                        token1_reward_amount)
-        VALUES
-        ${incentiveRewardPeriodRowData
-          .map(
-            ({
-              token0,
-              token1,
-              startDate,
-              endDate,
-              realizedVolatility,
-              token0RewardAmount,
-              token1RewardAmount,
-            }) =>
-              `(${
-                campaign.id
-              }, ${token0}, ${token1}, '${startDate.toISOString()}', '${endDate.toISOString()}', ${realizedVolatility}, ${token0RewardAmount}, ${token1RewardAmount})`,
-          )
-          .join(",\n")}
-            ON CONFLICT (campaign_id, token0, token1, start_time, end_time)
-        DO UPDATE SET
-            token0_reward_amount = EXCLUDED.token0_reward_amount,
-            token1_reward_amount = EXCLUDED.token1_reward_amount,
-            rewards_last_computed_at = CASE
-                WHEN (incentives.campaign_reward_periods.token0_reward_amount != EXCLUDED.token0_reward_amount
-                  OR incentives.campaign_reward_periods.token1_reward_amount != EXCLUDED.token1_reward_amount) AND
-                  incentives.campaign_reward_periods.id NOT IN (SELECT campaign_reward_period_id FROM incentives.generated_drop_reward_periods)
-                THEN NULL
-                ELSE incentives.campaign_reward_periods.rewards_last_computed_at
-            END;
-    `,
-  });
-
-  await client.query(`COMMIT;`);
 
   console.log(`Successfully finished import of ${rowCount} rows`);
 } finally {
-  await client.end();
+  await sql.end();
 }

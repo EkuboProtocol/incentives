@@ -1,47 +1,44 @@
-import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
+import postgres from "postgres";
 
-const client = await initializeIncentivesClient();
+const sql = postgres({ types: { bigint: postgres.BigInt } });
+let rewardPeriodIds: string[] = [];
 
 try {
-  await client.query("BEGIN;");
-
-  const rewardPeriodIds = process.env.REWARD_PERIODS
-    ? process.env.REWARD_PERIODS.split(",").map((p) => p.trim())
-    : (
-        await client.query<{
+  await sql.begin(async (tx) => {
+    rewardPeriodIds = (
+      await tx<
+        {
           id: string;
-        }>({
-          text: `
+        }[]
+      >`
             SELECT id
             FROM incentives.campaign_reward_periods
             WHERE rewards_last_computed_at IS NULL
-              AND end_time <= (SELECT time
-                               FROM blocks
-                               WHERE hash != 0
-                               ORDER BY number DESC
-                               LIMIT 1)
+              AND end_time <= (
+                SELECT time
+                FROM blocks
+                WHERE hash != 0
+                ORDER BY number DESC
+                LIMIT 1
+              )
             ORDER BY end_time
-          `,
-        })
-      ).rows.map(({ id }) => id);
+          `
+    ).map(({ id }) => id);
 
-  console.log(`Found ${rewardPeriodIds.length} periods to process`);
+    console.log(`Found ${rewardPeriodIds.length} periods to process`);
 
-  for (const id of rewardPeriodIds) {
-    console.log(`Processing period ID ${id}`);
+    for (const id of rewardPeriodIds) {
+      console.log(`Processing period ID ${id}`);
 
-    const processingStartTime = new Date().getTime();
+      const processingStartTime = Date.now();
 
-    // first delete all the data for the day
-    await client.query({
-      text: `DELETE
-                   FROM incentives.computed_rewards
-                   WHERE campaign_reward_period_id = $1`,
-      values: [id],
-    });
+      await tx`
+        DELETE
+        FROM incentives.computed_rewards
+        WHERE campaign_reward_period_id = ${id};
+      `;
 
-    await client.query({
-      text: `
+      await tx`
 INSERT INTO incentives.computed_rewards (campaign_reward_period_id, locker, salt, reward_amount) (
 WITH period_info AS (
 	SELECT
@@ -63,7 +60,7 @@ WITH period_info AS (
 		incentives.campaign_reward_periods crp
 		JOIN incentives.campaigns c ON crp.campaign_id = c.id
 	WHERE
-		crp.id = $1
+		crp.id = ${id}
 ),
 -- the first event contained in the period
 min_event_id AS (
@@ -417,35 +414,28 @@ FROM
 WHERE
 	reward_amount > 0
 );
-      `,
-      values: [
-        // the period
-        id,
-      ],
-    });
+      `;
 
-    await client.query({
-      text: `UPDATE incentives.campaign_reward_periods
-                   SET rewards_last_computed_at = CURRENT_TIMESTAMP
-                   WHERE id = $1`,
-      values: [id],
-    });
+      await tx`
+        UPDATE incentives.campaign_reward_periods
+        SET rewards_last_computed_at = CURRENT_TIMESTAMP
+        WHERE id = ${id};
+      `;
 
-    console.log(
-      `Finished processing period ${id} in ${
-        (new Date().getTime() - processingStartTime) / 1000
-      } seconds`,
-    );
-  }
+      console.log(
+        `Finished processing period ${id} in ${
+          (Date.now() - processingStartTime) / 1000
+        } seconds`,
+      );
+    }
+  });
 
-  await client.query(`COMMIT;`);
   console.log(
     `Successfully finished processing ${rewardPeriodIds.length} periods`,
   );
 } catch (e) {
   console.error("Encountered error", e);
-  await client.query("ROLLBACK;");
   process.exit(1);
 } finally {
-  await client.end();
+  await sql.end();
 }

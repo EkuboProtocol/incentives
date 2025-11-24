@@ -1,6 +1,6 @@
 import { Allocation } from "./util/airdrop.js";
 import { generateAndInsertDrop } from "./util/generateAndInsertDrop.js";
-import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
+import postgres from "postgres";
 import { EVM_AIRDROP_CONTRACT_OPTIONS } from "./util/evmAirdropContract.js";
 import { STARKNET_AIRDROP_CONTRACT_OPTIONS } from "./util/starknetAirdropContract.js";
 
@@ -28,20 +28,19 @@ if (!POSITIONS_LOCKER_ADDRESS) {
   throw new Error(`Missing "POSITIONS_LOCKER_ADDRESS" env variable`);
 }
 
-const client = await initializeIncentivesClient();
+const sql = postgres({ types: { bigint: postgres.BigInt } });
 
 try {
-  await client.query("BEGIN;");
-  await client.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;");
+  await sql.begin(async (tx) => {
+    await tx`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;`;
 
-  const { rows: pendingDrops } = await client.query<{
-    slug: string;
-    minimum_allocation: string;
-    period_ids: string[];
-    first_start_time: Date;
-    last_end_time: Date;
-  }>({
-    text: `
+    const pendingDrops = await tx<{
+      slug: string;
+      minimum_allocation: string;
+      period_ids: string[];
+      first_start_time: Date;
+      last_end_time: Date;
+    }[]>`
       WITH campaign_info AS (
         SELECT
           id,
@@ -114,26 +113,25 @@ try {
         AND FALSE = ALL (cp.has_been_dropped)
         AND cp.first_start_time = c.start_time
         AND cp.last_end_time = c.end_time;
-      `,
-  });
+      `;
 
-  for (const {
-    slug,
-    period_ids,
-    minimum_allocation,
-    first_start_time,
-    last_end_time,
-  } of pendingDrops) {
-    console.log(
-      `Computing drop for ${slug} for periods between ${first_start_time} to ${last_end_time}`,
-    );
+    for (const {
+      slug,
+      period_ids,
+      minimum_allocation,
+      first_start_time,
+      last_end_time,
+    } of pendingDrops) {
+      console.log(
+        `Computing drop for ${slug} for periods between ${first_start_time} to ${last_end_time}`,
+      );
 
-    const { rows: rewardsRaw } = await client.query<{
-      owner: string;
-      total: string;
-    }>({
-      values: [POSITIONS_LOCKER_ADDRESS],
-      text: `
+      const rewardsRaw = await tx<
+        {
+          owner: string;
+          total: string;
+        }[]
+      >`
         WITH reward_periods AS (
           SELECT
             id,
@@ -141,7 +139,7 @@ try {
           FROM
             incentives.campaign_reward_periods crp
           WHERE
-            crp.id IN (${period_ids.join(", ")})
+            crp.id IN ${tx(period_ids)}
         ),
         rewards_by_locker_salt AS (
           SELECT
@@ -194,70 +192,71 @@ try {
           floor(sum(rbls.total)) AS total
         FROM
           rewards_by_locker_salt rbls
-          LEFT JOIN token_owners t_o ON t_o.token_id = rbls.salt AND rbls.locker = $1
+          LEFT JOIN token_owners t_o ON t_o.token_id = rbls.salt AND rbls.locker = ${POSITIONS_LOCKER_ADDRESS.toString()}
         GROUP BY
           1
         ORDER BY
           2 DESC
-        `,
-    });
+        `;
 
-    const minimumAllocation = BigInt(minimum_allocation);
+      const minimumAllocation = BigInt(minimum_allocation);
 
-    const filteredStats = rewardsRaw.reduce<{ amount: bigint; count: number }>(
-      (memo, { total }) => {
-        const filtered = BigInt(total) < minimumAllocation;
-        if (filtered) {
-          return {
-            count: memo.count + 1,
-            amount: memo.amount + BigInt(total),
-          };
-        } else {
-          return memo;
-        }
-      },
-      { amount: 0n, count: 0 },
-    );
-
-    const amounts: Allocation[] = rewardsRaw
-      .map(({ owner, total }) => ({
-        owner: BigInt(owner),
-        total: BigInt(total),
-      }))
-      .filter(({ total }) => total >= minimumAllocation)
-      .sort(({ total: a }, { total: b }) => Number(b - a))
-      .map(({ total, owner }) => ({ address: owner, amount: total }));
-
-    if (amounts.length === 0) {
-      console.log(
-        `No allocations met the threshold for the following periods: ${period_ids.join(
-          ", ",
-        )}`,
+      const filteredStats = rewardsRaw.reduce<{
+        amount: bigint;
+        count: number;
+      }>(
+        (memo, { total }) => {
+          const filtered = BigInt(total) < minimumAllocation;
+          if (filtered) {
+            return {
+              count: memo.count + 1,
+              amount: memo.amount + BigInt(total),
+            };
+          } else {
+            return memo;
+          }
+        },
+        { amount: 0n, count: 0 },
       );
-      continue;
+
+      const amounts: Allocation[] = rewardsRaw
+        .map(({ owner, total }) => ({
+          owner: BigInt(owner),
+          total: BigInt(total),
+        }))
+        .filter(({ total }) => total >= minimumAllocation)
+        .sort(({ total: a }, { total: b }) => Number(b - a))
+        .map(({ total, owner }) => ({ address: owner, amount: total }));
+
+      if (amounts.length === 0) {
+        console.log(
+          `No allocations met the threshold for the following periods: ${period_ids.join(
+            ", ",
+          )}`,
+        );
+        continue;
+      }
+
+      const sum = amounts.reduce((memo, { amount }) => memo + amount, 0n);
+
+      const dropId = await generateAndInsertDrop(
+        tx,
+        amounts,
+        period_ids,
+        airdropContractOptions,
+      );
+
+      console.log("Campaign: ", slug);
+      console.log("Periods: ", period_ids.join(", "));
+      console.log("First start time: ", first_start_time);
+      console.log("Last end time: ", last_end_time);
+      console.log("Created drop ID: ", dropId);
+      console.log("Raw total: ", sum);
+      console.log("Minimum allocation: ", Number(minimumAllocation) / 1e18);
+      console.log("Filtered out: ", filteredStats);
+      console.log("Formatted amount: ", Number(sum) / 1e18);
     }
-
-    const sum = amounts.reduce((memo, { amount }) => memo + amount, 0n);
-
-    const dropId = await generateAndInsertDrop(
-      client,
-      amounts,
-      period_ids,
-      airdropContractOptions,
-    );
-
-    console.log("Campaign: ", slug);
-    console.log("Periods: ", period_ids.join(", "));
-    console.log("First start time: ", first_start_time);
-    console.log("Last end time: ", last_end_time);
-    console.log("Created drop ID: ", dropId);
-    console.log("Raw total: ", sum);
-    console.log("Minimum allocation: ", Number(minimumAllocation) / 1e18);
-    console.log("Filtered out: ", filteredStats);
-    console.log("Formatted amount: ", Number(sum) / 1e18);
-  }
-
-  await client.query("COMMIT;");
+  });
 } finally {
-  await client.end();
+  await sql.end();
 }

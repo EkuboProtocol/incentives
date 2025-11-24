@@ -1,4 +1,4 @@
-import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
+import postgres from "postgres";
 import {
   checksumAddress,
   createPublicClient,
@@ -52,15 +52,14 @@ const chainId = await walletClient.getChainId();
 
 console.log(`Funding drops for chain ID ${chainId}`);
 
-const client = await initializeIncentivesClient();
+const sql = postgres({ types: { bigint: postgres.BigInt } });
 
 try {
-  const { rows } = await client.query<{
+  const rows = await sql<{
     root: string;
     reward_token: string;
     total_amount: string;
-  }>({
-    text: `
+  }>`
             WITH drop_amounts AS
                      (SELECT drop_id,
                              SUM(amount) AS total
@@ -80,8 +79,7 @@ try {
                      JOIN drop_tokens dt ON gd.id = dt.drop_id
             WHERE ARRAY_LENGTH(dt.reward_tokens, 1) = 1
               AND gd.root NOT IN (SELECT root FROM incentives_funded)
-        `,
-  });
+        `;
 
   if (rows.length === 0) {
     console.log("No drops to fund");
@@ -118,5 +116,5 @@ try {
     );
   }
 } finally {
-  await client.end();
+  await sql.end();
 }

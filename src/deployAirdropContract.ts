@@ -1,6 +1,6 @@
 import { Account, RpcProvider } from "starknet";
-import initializeIncentivesClient from "./util/initializeIncentivesClient.js";
 import TelegramBot from "node-telegram-bot-api";
+import postgres from "postgres";
 import { fetchTokens } from "./util/tokens.js";
 
 // Environment variables for Telegram
@@ -118,7 +118,7 @@ async function sendTelegramMessage(
     .map(escapeMarkdownV2)
     .join(", ");
 
-  // Convert dates to Date objects if they're strings (pg returns timestamptz as strings)
+  // Convert dates to Date objects if they're strings (postgres returns timestamptz as strings)
   const startDate =
     dropInfo.min_start_time instanceof Date
       ? dropInfo.min_start_time
@@ -152,16 +152,17 @@ async function sendTelegramMessage(
 // Fetch token metadata from API
 const tokens = await fetchTokens(0x534e5f4d41494en);
 
-const client = await initializeIncentivesClient();
+const sql = postgres({ types: { bigint: postgres.BigInt } });
 
 try {
   // First, check for drops with multiple tokens and throw an error if any exist
-  const { rows: multiTokenDrops } = await client.query<{
-    drop_id: string;
-    num_tokens: number;
-    token_list: string[];
-  }>({
-    text: `
+  const multiTokenDrops = await sql<
+    {
+      drop_id: string;
+      num_tokens: number;
+      token_list: string[];
+    }[]
+  >`
       SELECT
         gd.id::text AS drop_id,
         COUNT(DISTINCT c.reward_token) AS num_tokens,
@@ -173,8 +174,7 @@ try {
       WHERE gd.id NOT IN (SELECT drop_id FROM incentives.deployed_airdrop_contracts)
       GROUP BY gd.id
       HAVING COUNT(DISTINCT c.reward_token) > 1
-    `,
-  });
+    `;
 
   if (multiTokenDrops.length > 0) {
     const dropDetails = multiTokenDrops
@@ -189,8 +189,7 @@ try {
   }
 
   // Query for all generated drops that haven't been deployed yet
-  const { rows: drops } = await client.query<DropInfoFromDB>({
-    text: `
+  const drops = await sql<DropInfoFromDB[]>`
       WITH drop_info AS (
         SELECT
           gd.id AS drop_id,
@@ -234,8 +233,7 @@ try {
       FROM drop_info di
       JOIN drop_amounts da ON di.drop_id = da.drop_id
       ORDER BY di.drop_id
-    `,
-  });
+    `;
 
   if (drops.length === 0) {
     console.log("No drops to deploy");
@@ -294,17 +292,10 @@ try {
     console.log("Deployed airdrop");
     console.log("Contract address:", deployResponse.contract_address);
 
-    await client.query({
-      text: `
-        INSERT INTO incentives.deployed_airdrop_contracts (address, token, drop_id)
-        VALUES ($1, $2, $3);
-      `,
-      values: [
-        BigInt(deployResponse.contract_address),
-        distributedToken,
-        BigInt(drop.drop_id),
-      ],
-    });
+    await sql`
+      INSERT INTO incentives.deployed_airdrop_contracts (address, token, drop_id)
+      VALUES (${BigInt(deployResponse.contract_address)}, ${distributedToken}, ${BigInt(drop.drop_id)});
+    `;
 
     console.log("Inserted airdrop row");
 
@@ -319,5 +310,5 @@ try {
   console.error("Error deploying drops:", error);
   throw error;
 } finally {
-  await client.end();
+  await sql.end();
 }
