@@ -47,7 +47,7 @@ const chainId = await walletClient.getChainId();
 console.log(`Funding drops for chain ID ${chainId}`);
 
 const sql = postgres({
-  ssl: { rejectUnauthorized: false },
+  ssl: "prefer",
   types: { bigint: postgres.BigInt },
 });
 

@@ -29,7 +29,7 @@ if (!POSITIONS_LOCKER_ADDRESS) {
 }
 
 const sql = postgres({
-  ssl: { rejectUnauthorized: false },
+  ssl: "prefer",
   types: { bigint: postgres.BigInt },
 });
 

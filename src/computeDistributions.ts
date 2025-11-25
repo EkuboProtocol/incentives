@@ -1,7 +1,7 @@
 import postgres from "postgres";
 
 const sql = postgres({
-  ssl: { rejectUnauthorized: false },
+  ssl: "prefer",
   types: { bigint: postgres.BigInt },
 });
 let rewardPeriodIds: string[] = [];

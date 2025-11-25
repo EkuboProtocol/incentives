@@ -153,7 +153,7 @@ async function sendTelegramMessage(
 const tokens = await fetchTokens(0x534e5f4d41494en);
 
 const sql = postgres({
-  ssl: { rejectUnauthorized: false },
+  ssl: "prefer",
   types: { bigint: postgres.BigInt },
 });
 

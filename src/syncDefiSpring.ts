@@ -70,7 +70,7 @@ const incentiveRewardPeriodRowData = Object.entries(
 });
 
 const sql = postgres({
-  ssl: { rejectUnauthorized: false },
+  ssl: "prefer",
   types: { bigint: postgres.BigInt },
 });
 let rowCount = 0;

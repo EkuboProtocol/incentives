@@ -1,5 +1,4 @@
 import postgres from "postgres";
-import { fetchEkuboDefiSpringData } from "./util/defiSpringApi.js";
 import { fetchTokens } from "./util/tokens.js";
 import { floatToRawValue } from "./util/floatToRawValue.js";
 import { fetchEkuboBtcFiData } from "./util/btcFiApi.js";
@@ -63,7 +62,7 @@ const incentiveRewardPeriodRowData = ekuboIncentivesData.items
   .filter((d) => d.token0RewardAmount !== 0n || d.token1RewardAmount !== 0n);
 
 const sql = postgres({
-  ssl: { rejectUnauthorized: false },
+  ssl: "prefer",
   types: { bigint: postgres.BigInt },
 });
 let rowCount = 0;
