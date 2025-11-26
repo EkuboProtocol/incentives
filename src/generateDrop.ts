@@ -34,10 +34,10 @@ const sql = postgres({
 });
 
 try {
-  await sql.begin(async (tx) => {
-    await tx`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;`;
+  await sql.begin(async (sql) => {
+    await sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;`;
 
-    const pendingDrops = await tx<
+    const pendingDrops = await sql<
       {
         slug: string;
         minimum_allocation: string;
@@ -131,7 +131,7 @@ try {
         `Computing drop for ${slug} for periods between ${first_start_time} to ${last_end_time}`,
       );
 
-      const rewardsRaw = await tx<
+      const rewardsRaw = await sql<
         {
           owner: string;
           total: string;
@@ -144,7 +144,7 @@ try {
           FROM
             incentives.campaign_reward_periods crp
           WHERE
-            crp.id IN ${tx(period_ids)}
+            crp.id IN ${sql(period_ids)}
         ),
         rewards_by_locker_salt AS (
           SELECT
@@ -245,7 +245,7 @@ try {
       const sum = amounts.reduce((memo, { amount }) => memo + amount, 0n);
 
       const dropId = await generateAndInsertDrop(
-        tx,
+        sql,
         amounts,
         period_ids,
         airdropContractOptions,

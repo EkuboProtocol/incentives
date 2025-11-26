@@ -5,9 +5,7 @@ import {
   generateProof,
   SiblingHashFunction,
 } from "./airdrop.js";
-import postgres from "postgres";
-
-type SqlClient = ReturnType<typeof postgres>;
+import { Sql } from "postgres";
 
 export interface GenerateAndInsertDropOptions {
   claimHashFunction(claim: Claim): bigint;
@@ -15,7 +13,7 @@ export interface GenerateAndInsertDropOptions {
 }
 
 export async function generateAndInsertDrop(
-  sql: SqlClient,
+  sql: Sql<{ bigint: bigint }>,
   allocations: Allocation[],
   rewardPeriodIds: (string | bigint)[],
   options: GenerateAndInsertDropOptions,
@@ -40,14 +38,14 @@ export async function generateAndInsertDrop(
 
   const [{ id: dropId }] = await sql<{ id: number }[]>`
       INSERT INTO incentives.generated_drop (root)
-      VALUES (${root})
+      VALUES (${root.toString()})
       RETURNING id;
     `;
 
   if (rewardPeriodIds.length > 0) {
     await sql`
-      INSERT INTO incentives.generated_drop_reward_periods (drop_id, campaign_reward_period_id)
-      VALUES ${sql(rewardPeriodIds.map((rp) => [dropId, rp]))};
+      INSERT INTO incentives.generated_drop_reward_periods 
+      ${sql(rewardPeriodIds.map((rpid) => ({ drop_id: dropId, campaign_reward_period_id: rpid })))}
     `;
   }
 
@@ -55,16 +53,24 @@ export async function generateAndInsertDrop(
     ({ claim: { id, address, amount }, proof }) => [
       dropId,
       id,
-      address,
-      amount,
+      address.toString(),
+      amount.toString(),
       sql.array(proof.map((p) => p.toString())),
     ],
   );
 
   if (proofRows.length > 0) {
     await sql`
-      INSERT INTO incentives.generated_drop_proof (drop_id, id, address, amount, proof)
-      VALUES ${sql(proofRows)};
+      INSERT INTO incentives.generated_drop_proof
+      ${sql(
+        claimsWithProofs.map((pr) => ({
+          drop_id: dropId,
+          id: pr.claim.id,
+          address: pr.claim.address.toString(),
+          amount: pr.claim.amount.toString(),
+          proof: sql.array(pr.proof.map((p) => p.toString())),
+        })),
+      )}
     `;
   }
 
