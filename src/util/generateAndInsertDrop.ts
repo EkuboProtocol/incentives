@@ -13,7 +13,7 @@ export interface GenerateAndInsertDropOptions {
 }
 
 export async function generateAndInsertDrop(
-  sql: Sql<{ bigint: bigint }>,
+  sql: Sql<{ bigint: bigint; numeric: bigint }>,
   allocations: Allocation[],
   rewardPeriodIds: (string | bigint)[],
   options: GenerateAndInsertDropOptions,
@@ -68,7 +68,7 @@ export async function generateAndInsertDrop(
           id: pr.claim.id,
           address: pr.claim.address.toString(),
           amount: pr.claim.amount.toString(),
-          proof: sql.array(pr.proof.map((p) => p.toString())),
+          proof: sql.array(pr.proof.map((p) => sql.typed(p, 1700))),
         })),
       )}
     `;

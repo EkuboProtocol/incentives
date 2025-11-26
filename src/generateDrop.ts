@@ -28,9 +28,29 @@ if (!POSITIONS_LOCKER_ADDRESS) {
   throw new Error(`Missing "POSITIONS_LOCKER_ADDRESS" env variable`);
 }
 
+const NumericIntegerType: postgres.PostgresType<bigint> = {
+  from: [1700],
+  to: 1700,
+  parse(v: string) {
+    try {
+      return BigInt(v);
+    } catch (e) {
+      throw new Error(`Failed to parse numeric integer type: "${v}"`);
+    }
+  },
+  serialize(v: any) {
+    if (typeof v === "string") {
+      return v;
+    }
+    if (typeof v !== "bigint")
+      throw new Error(`Unexpected numeric integer type: "${v}"`);
+    return v.toString();
+  },
+};
+
 const sql = postgres({
   ssl: "prefer",
-  types: { bigint: postgres.BigInt },
+  types: { bigint: postgres.BigInt, numeric: NumericIntegerType },
 });
 
 try {
