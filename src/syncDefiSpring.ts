@@ -143,5 +143,5 @@ try {
 
   console.log(`Successfully finished import of ${rowCount} rows`);
 } finally {
-  await sql.end();
+  await sql.end({ timeout: 5 });
 }

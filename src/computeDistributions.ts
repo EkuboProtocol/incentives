@@ -440,5 +440,5 @@ WHERE
   console.error("Encountered error", e);
   process.exit(1);
 } finally {
-  await sql.end();
+  await sql.end({ timeout: 5 });
 }

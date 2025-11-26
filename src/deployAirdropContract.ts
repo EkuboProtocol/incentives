@@ -313,5 +313,5 @@ try {
   console.error("Error deploying drops:", error);
   throw error;
 } finally {
-  await sql.end();
+  await sql.end({ timeout: 5 });
 }
