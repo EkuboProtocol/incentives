@@ -297,7 +297,7 @@ try {
 
     await sql`
       INSERT INTO incentives.deployed_airdrop_contracts (address, token, drop_id)
-      VALUES (${BigInt(deployResponse.contract_address)}, ${distributedToken}, ${BigInt(drop.drop_id)});
+      VALUES (${BigInt(deployResponse.contract_address).toString()}, ${distributedToken.toString()}, ${BigInt(drop.drop_id)});
     `;
 
     console.log("Inserted airdrop row");
