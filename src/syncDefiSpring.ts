@@ -22,9 +22,6 @@ const incentiveRewardPeriodRowData = Object.entries(
   ekuboIncentivesData,
 ).flatMap(([pair, data]) => {
   let [symbolA, symbolB] = pair.split("/");
-  // temporary rename for OBL endpoint
-  if (symbolA === "USDC") symbolA = "USDC.e";
-  if (symbolB === "USDC") symbolB = "USDC.e";
 
   const tokenA = tokens.filter(
     (t) => t.symbol.toUpperCase() === symbolA.toUpperCase(),
