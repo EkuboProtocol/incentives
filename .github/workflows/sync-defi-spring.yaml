@@ -3,6 +3,7 @@ name: Sync DeFi Spring
 on:
   schedule:
     - cron: "*/15 * * * *"
+  workflow_dispatch:
 
 concurrency: sync-defi-spring
 
