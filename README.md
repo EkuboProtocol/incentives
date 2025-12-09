@@ -50,7 +50,6 @@ The workflow can be triggered manually via GitHub Actions. It will automatically
 
 - `sync-defi-spring` - Syncs DeFi Spring campaign data
 - `sync-btcfi` - Syncs BTC-Fi campaign data
-- `compute-distributions` - Computes reward distributions
 - `generate-drop` - Generates merkle drops from computed rewards
 - `fund-drops` - Funds deployed airdrop contracts
 

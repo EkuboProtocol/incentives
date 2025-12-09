@@ -4,7 +4,6 @@
   "scripts": {
     "sync-defi-spring": "bun src/syncDefiSpring.ts",
     "sync-btcfi": "bun src/syncBtcFi.ts",
-    "compute-distributions": "bun src/computeDistributions.ts",
     "deploy-airdrop-contract": "bun src/deployAirdropContract.ts",
     "generate-drop": "bun src/generateDrop.ts",
     "fund-drops": "bun src/fundDrops.ts",
