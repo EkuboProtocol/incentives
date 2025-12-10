@@ -30,8 +30,10 @@ const incentiveRewardPeriodRowData = Object.entries(
     (t) => t.symbol.toUpperCase() === symbolB.toUpperCase(),
   );
 
-  if (tokenA.length !== 1 || tokenB.length !== 1)
-    throw new Error(`Unrecognized pair: ${pair}`);
+  if (tokenA.length !== 1 || tokenB.length !== 1) {
+    console.warn(`Unrecognized pair: ${pair}`);
+    return [];
+  }
 
   const [token0, token1] =
     BigInt(tokenA[0].address) < BigInt(tokenB[0].address)
