@@ -9,23 +9,6 @@ concurrency: generate-drop
 
 jobs:
   run:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - database: "eth_mainnet"
-            network_type: "EVM"
-            positions_locker_address: "0xA37cc341634AFD9E0919D334606E676dbAb63E17"
-          - database: "eth_sepolia"
-            network_type: "EVM"
-            positions_locker_address: "0xA37cc341634AFD9E0919D334606E676dbAb63E17"
-          - database: "mainnet"
-            network_type: "STARKNET"
-            positions_locker_address: "0x02e0af29598b407c8716b17f6d2795eca1b471413fa03fb145a5e33722184067"
-          - database: "sepolia"
-            network_type: "STARKNET"
-            positions_locker_address: "0x06a2aee84bb0ed5dded4384ddd0e40e9c1372b818668375ab8e3ec08807417e5"
-
     runs-on: ubuntu-latest
     name: Run
     steps:

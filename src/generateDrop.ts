@@ -4,21 +4,10 @@ import postgres from "postgres";
 import { EVM_AIRDROP_CONTRACT_OPTIONS } from "./util/evmAirdropContract.js";
 import { STARKNET_AIRDROP_CONTRACT_OPTIONS } from "./util/starknetAirdropContract.js";
 
-const AIRDROP_CONTRACT_OPTIONS_BY_NETWORK_TYPE = {
-  STARKNET: STARKNET_AIRDROP_CONTRACT_OPTIONS,
-  EVM: EVM_AIRDROP_CONTRACT_OPTIONS,
+const AIRDROP_CONTRACT_OPTIONS_BY_CHAIN_ID = {
+  ["23448594291968334"]: STARKNET_AIRDROP_CONTRACT_OPTIONS,
+  ["1"]: EVM_AIRDROP_CONTRACT_OPTIONS,
 };
-
-const airdropContractOptions =
-  AIRDROP_CONTRACT_OPTIONS_BY_NETWORK_TYPE[process.env.NETWORK_TYPE];
-
-if (!airdropContractOptions) {
-  throw new Error(
-    `NETWORK_TYPE must be one of ${Object.keys(
-      AIRDROP_CONTRACT_OPTIONS_BY_NETWORK_TYPE,
-    ).join(", ")}`,
-  );
-}
 
 const POSITIONS_LOCKER_ADDRESS = BigInt(
   process.env.POSITIONS_LOCKER_ADDRESS ?? 0,
@@ -59,21 +48,40 @@ try {
 
     const pendingDrops = await sql<
       {
+        chain_id: bigint;
         slug: string;
         minimum_allocation: string;
         period_ids: string[];
-        first_start_time: Date | string;
-        last_end_time: Date | string;
+        first_start_time: Date;
+        last_end_time: Date;
       }[]
-    >`SELECT slug, minimum_allocation, period_ids, first_start_time, last_end_time FROM incentives.pending_drop_cadences`;
+    >`
+SELECT chain_id,
+       slug,
+       minimum_allocation,
+       period_ids,
+       first_start_time,
+       last_end_time
+FROM incentives.pending_drop_cadences
+`;
 
     for (const {
+      chain_id,
       slug,
       period_ids,
       minimum_allocation,
       first_start_time,
       last_end_time,
     } of pendingDrops) {
+      const airdropContractOptions =
+        AIRDROP_CONTRACT_OPTIONS_BY_CHAIN_ID[chain_id.toString()];
+      if (!airdropContractOptions) {
+        console.error(
+          `Skipping drop for ${slug} because no airdrop contract options for chain id ${chain_id}`,
+        );
+        continue;
+      }
+
       console.log(
         `Computing drop for ${slug} for periods between ${first_start_time} to ${last_end_time}`,
       );
