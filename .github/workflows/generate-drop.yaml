@@ -30,5 +30,4 @@ jobs:
           PGSSLMODE: require
           NODE_TLS_REJECT_UNAUTHORIZED: 0
           PGDATABASE: ${{ secrets.POSTGRES_DATABASE }}
-          POSITIONS_LOCKER_ADDRESS: ${{ matrix.positions_locker_address }}
         run: bun generate-drop

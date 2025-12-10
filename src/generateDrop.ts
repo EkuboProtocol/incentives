@@ -9,14 +9,6 @@ const AIRDROP_CONTRACT_OPTIONS_BY_CHAIN_ID = {
   ["1"]: EVM_AIRDROP_CONTRACT_OPTIONS,
 };
 
-const POSITIONS_LOCKER_ADDRESS = BigInt(
-  process.env.POSITIONS_LOCKER_ADDRESS ?? 0,
-);
-
-if (!POSITIONS_LOCKER_ADDRESS) {
-  throw new Error(`Missing "POSITIONS_LOCKER_ADDRESS" env variable`);
-}
-
 const NumericIntegerType: postgres.PostgresType<bigint> = {
   from: [1700],
   to: 1700,
