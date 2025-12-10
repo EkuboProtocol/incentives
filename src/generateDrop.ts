@@ -65,80 +65,7 @@ try {
         first_start_time: Date | string;
         last_end_time: Date | string;
       }[]
-    >`
-      WITH campaign_info AS (
-        SELECT
-          id,
-          slug,
-          minimum_allocation,
-          start_time,
-          end_time,
-          distribution_cadence,
-          floor(extract(epoch FROM CURRENT_TIMESTAMP - start_time) / extract(epoch FROM distribution_cadence)) AS num_distributions
-        FROM
-          incentives.campaigns
-      ),
-      cadences AS (
-        SELECT
-          id AS campaign_id,
-          cadence_id,
-          (
-            CASE WHEN cadence_id = 0 THEN
-            (
-              SELECT
-                min(crp2.start_time)
-              FROM
-                incentives.campaign_reward_periods crp2
-              WHERE
-                crp2.campaign_id = ci.id)
-            ELSE
-              start_time + distribution_cadence * cadence_id
-            END) AS start_time,
-        LEAST ((start_time + distribution_cadence * (cadence_id + 1)), ci.end_time) AS end_time
-      FROM
-        campaign_info ci,
-        generate_series(0, num_distributions) AS cadence_id
-      ),
-      cadence_periods AS (
-        SELECT
-          c.campaign_id,
-          c.cadence_id,
-          array_agg(crp.id ORDER BY crp.start_time) AS period_ids,
-          array_agg(crp.rewards_last_computed_at IS NOT NULL) AS has_been_computed,
-          array_agg(crp.id IN (
-              SELECT
-                campaign_reward_period_id
-              FROM incentives.generated_drop_reward_periods)) AS has_been_dropped,
-          min(crp.start_time) first_start_time,
-          max(crp.end_time) last_end_time
-        FROM
-          incentives.campaign_reward_periods crp
-          JOIN cadences c ON crp.campaign_id = c.campaign_id
-            AND crp.start_time >= c.start_time
-            AND crp.start_time <= c.end_time
-            AND crp.end_time >= c.start_time
-            AND crp.end_time <= c.end_time
-        GROUP BY
-          c.campaign_id,
-          cadence_id
-      )
-      SELECT
-        ci.slug,
-        ci.minimum_allocation,
-        cp.period_ids,
-        cp.first_start_time,
-        cp.last_end_time
-      FROM
-        cadence_periods cp
-        JOIN cadences c ON cp.campaign_id = c.campaign_id
-          AND cp.cadence_id = c.cadence_id
-        JOIN campaign_info ci ON c.campaign_id = ci.id
-      WHERE
-        TRUE = ALL (cp.has_been_computed)
-        AND FALSE = ALL (cp.has_been_dropped)
-        AND cp.first_start_time = c.start_time
-        AND cp.last_end_time = c.end_time;
-      `;
+    >`SELECT slug, minimum_allocation, period_ids, first_start_time, last_end_time FROM incentives.pending_drop_cadences`;
 
     for (const {
       slug,
@@ -156,73 +83,7 @@ try {
           owner: string;
           total: string;
         }[]
-      >`
-        WITH reward_periods AS (
-          SELECT
-            id,
-            end_time
-          FROM
-            incentives.campaign_reward_periods crp
-          WHERE
-            crp.id IN ${sql(period_ids)}
-        ),
-        rewards_by_locker_salt AS (
-          SELECT
-            locker,
-            salt,
-            sum(reward_amount) AS total
-          FROM
-            incentives.computed_rewards cr
-          WHERE
-            cr.campaign_reward_period_id IN (
-              SELECT
-                id
-              FROM
-                reward_periods)
-            GROUP BY
-              locker,
-              salt
-        ),
-        last_reward_period_end_time AS (
-          SELECT
-            max(end_time) AS last_end_time
-        FROM
-          reward_periods
-        ),
-        ranked_transfers AS (
-          SELECT
-            token_id,
-            to_address,
-            row_number() OVER (PARTITION BY token_id ORDER BY event_id DESC) AS row_no
-        FROM
-          position_transfers pt
-          JOIN event_keys ek ON pt.event_id = ek.id
-          JOIN blocks b ON ek.block_number = b.number,
-          last_reward_period_end_time
-          WHERE
-            to_address != 0
-            AND b.time < last_reward_period_end_time.last_end_time
-        ),
-        token_owners AS (
-          SELECT
-            token_id,
-            to_address AS owner
-          FROM
-            ranked_transfers
-          WHERE
-            row_no = 1
-        )
-        SELECT
-          coalesce(t_o.owner, rbls.locker) AS owner,
-          floor(sum(rbls.total)) AS total
-        FROM
-          rewards_by_locker_salt rbls
-          LEFT JOIN token_owners t_o ON t_o.token_id = rbls.salt AND rbls.locker = ${POSITIONS_LOCKER_ADDRESS.toString()}
-        GROUP BY
-          1
-        ORDER BY
-          2 DESC
-        `;
+      >`SELECT recipient as owner, amount as total FROM incentives.drop_allocations(${sql(period_ids)})`;
 
       const minimumAllocation = BigInt(minimum_allocation);
 
