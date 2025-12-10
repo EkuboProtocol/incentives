@@ -83,7 +83,9 @@ FROM incentives.pending_drop_cadences
           owner: string;
           total: string;
         }[]
-      >`SELECT recipient as owner, amount as total FROM incentives.drop_allocations(${sql(period_ids)})`;
+      >`SELECT recipient as owner, amount as total FROM incentives.drop_allocations(${sql(period_ids.map((pi) => pi.toString()))})`;
+
+      console.log(`Found ${rewardsRaw.length} recipients`);
 
       const minimumAllocation = BigInt(minimum_allocation);
 

@@ -49,26 +49,16 @@ export async function generateAndInsertDrop(
     `;
   }
 
-  const proofRows = claimsWithProofs.map(
-    ({ claim: { id, address, amount }, proof }) => [
-      dropId,
-      id,
-      address.toString(),
-      amount.toString(),
-      sql.array(proof.map((p) => p.toString())),
-    ],
-  );
-
-  if (proofRows.length > 0) {
+  if (claimsWithProofs.length > 0) {
     await sql`
       INSERT INTO incentives.generated_drop_proof
       ${sql(
-        claimsWithProofs.map((pr) => ({
+        claimsWithProofs.map(({ claim: { id, address, amount }, proof }) => ({
           drop_id: dropId,
-          id: pr.claim.id,
-          address: pr.claim.address.toString(),
-          amount: pr.claim.amount.toString(),
-          proof: sql.array(pr.proof.map((p) => sql.typed(p, 1700))),
+          id: id,
+          address: address.toString(),
+          amount: amount.toString(),
+          proof: sql.array(proof.map((p) => sql.typed(BigInt(p), 1700))),
         })),
       )}
     `;
