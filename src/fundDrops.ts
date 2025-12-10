@@ -27,9 +27,10 @@ const chains = [
   { id: 1, config: mainnet },
   { id: 11155111, config: sepolia },
 ];
-const chainIndex = chains.findIndex(
-  (c) => c.id === Number(process.env.CHAIN_ID),
-);
+
+const CHAIN_ID = BigInt(process.env.CHAIN_ID);
+const chainIndex = chains.findIndex((c) => c.id === Number(CHAIN_ID));
+
 if (chainIndex === -1) {
   throw new Error("Unsupported CHAIN ID");
 }
@@ -59,26 +60,30 @@ try {
       total_amount: string;
     }[]
   >`
-            WITH drop_amounts AS
-                     (SELECT drop_id,
-                             SUM(amount) AS total
-                      FROM incentives.generated_drop_proof
-                      GROUP BY drop_id),
-                 drop_tokens AS
-                     (SELECT drop_id, ARRAY_AGG(DISTINCT c.reward_token) AS reward_tokens
-                      FROM incentives.generated_drop_reward_periods gdrp
-                               JOIN incentives.campaign_reward_periods crp ON gdrp.campaign_reward_period_id = crp.id
-                               JOIN incentives.campaigns c ON crp.campaign_id = c.id
-                      GROUP BY gdrp.drop_id)
-            SELECT gd.root             AS root,
-                   dt.reward_tokens[1] AS reward_token,
-                   da.total            AS total_amount
-            FROM incentives.generated_drop gd
-                     JOIN drop_amounts da ON gd.id = da.drop_id
-                     JOIN drop_tokens dt ON gd.id = dt.drop_id
-            WHERE ARRAY_LENGTH(dt.reward_tokens, 1) = 1
-              AND gd.root NOT IN (SELECT root FROM incentives_funded)
-        `;
+WITH drop_amounts AS
+         (SELECT drop_id,
+                 SUM(amount) AS total
+          FROM incentives.generated_drop_proof
+          GROUP BY drop_id),
+     drop_tokens AS
+         (SELECT drop_id,
+                 ARRAY_AGG(DISTINCT c.reward_token)  AS reward_tokens,
+                 ARRAY_AGG(DISTINCT crp.campaign_id) AS campaign_ids
+          FROM incentives.generated_drop_reward_periods gdrp
+                   JOIN incentives.campaign_reward_periods crp ON gdrp.campaign_reward_period_id = crp.id
+                   JOIN incentives.campaigns c ON crp.campaign_id = c.id
+          GROUP BY gdrp.drop_id)
+SELECT gd.root             AS root,
+       dt.reward_tokens[1] AS reward_token,
+       da.total            AS total_amount
+FROM incentives.generated_drop gd
+         JOIN drop_amounts da ON gd.id = da.drop_id
+         JOIN drop_tokens dt ON gd.id = dt.drop_id
+         JOIN incentives.campaigns c ON dt.campaign_ids[1] = c.id
+WHERE ARRAY_LENGTH(dt.reward_tokens, 1) = 1
+  AND ARRAY_LENGTH(dt.campaign_ids, 1) = 1
+  AND gd.root NOT IN (SELECT root FROM incentives_funded)
+  AND c.chain_id = ${CHAIN_ID}`;
 
   if (rows.length === 0) {
     console.log("No drops to fund");
