@@ -82,6 +82,7 @@ function formatWithSignificantFigures(
 
 interface DropInfo {
   drop_id: string;
+  chain_id: bigint;
   root: string;
   reward_token: string;
   token_symbol: string;
@@ -178,6 +179,7 @@ SELECT di.drop_id::TEXT,
        token_symbol,
        token_decimals,
        c.name               AS campaign_name,
+       c.chain_id,
        di.min_start_time,
        di.max_end_time,
        da.drop_total_amount::TEXT,
@@ -190,7 +192,9 @@ FROM drop_info di
          JOIN drop_amounts da ON di.drop_id = da.drop_id
          JOIN incentives.campaigns c ON di.campaign_ids[1] = c.id
          JOIN erc20_tokens t ON t.chain_id = c.chain_id AND t.token_address = c.reward_token
-WHERE ARRAY_LENGTH(di.campaign_ids, 1) = 1
+WHERE ARRAY_LENGTH(di.campaign_ids, 1) = 1 
+  -- limit this script to starknet mainnet
+  AND c.chain_id = 23448594291968334
 ORDER BY di.drop_id
     `;
 
@@ -224,8 +228,8 @@ ORDER BY di.drop_id
     console.log("Contract address:", deployResponse.contract_address);
 
     await sql`
-      INSERT INTO incentives.deployed_airdrop_contracts (address, token, drop_id)
-      VALUES (${BigInt(deployResponse.contract_address).toString()}, ${distributedToken.toString()}, ${BigInt(drop.drop_id)});
+      INSERT INTO incentives.deployed_airdrop_contracts (chain_id, address, token, drop_id)
+      VALUES (${drop.chain_id}, ${BigInt(deployResponse.contract_address).toString()}, ${distributedToken.toString()}, ${BigInt(drop.drop_id)});
     `;
 
     console.log("Inserted airdrop row");
