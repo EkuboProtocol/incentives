@@ -1,7 +1,6 @@
 import { Account, RpcProvider } from "starknet";
 import TelegramBot from "node-telegram-bot-api";
 import postgres from "postgres";
-import { fetchTokens } from "./util/tokens.js";
 
 // Environment variables for Telegram
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -43,26 +42,6 @@ try {
   );
 }
 
-interface DropInfoFromDB {
-  drop_id: string;
-  root: string;
-  reward_token: string;
-  campaign_names: string[];
-  min_start_time: Date | string;
-  max_end_time: Date | string;
-  drop_total_amount: string;
-  period_total_amount: string;
-  num_addresses: number;
-  avg_amount: string;
-  median_amount: string;
-  max_amount: string;
-}
-
-interface DropInfo extends DropInfoFromDB {
-  token_symbol: string;
-  token_decimals: number;
-}
-
 /**
  * Escapes MarkdownV2 special characters to prevent parsing errors
  */
@@ -101,6 +80,23 @@ function formatWithSignificantFigures(
   });
 }
 
+interface DropInfo {
+  drop_id: string;
+  root: string;
+  reward_token: string;
+  token_symbol: string;
+  token_decimals: number;
+  campaign_name: string;
+  min_start_time: Date;
+  max_end_time: Date;
+  drop_total_amount: string;
+  period_total_amount: string;
+  num_addresses: number;
+  avg_amount: string;
+  median_amount: string;
+  max_amount: string;
+}
+
 /**
  * Sends a Telegram message about the deployed contract
  */
@@ -114,9 +110,7 @@ async function sendTelegramMessage(
   const maxAmount = BigInt(dropInfo.max_amount);
 
   // Escape campaign names to prevent MarkdownV2 parsing issues
-  const escapedCampaigns = dropInfo.campaign_names
-    .map(escapeMarkdownV2)
-    .join(", ");
+  const escapedCampaigns = escapeMarkdownV2(dropInfo.campaign_name);
 
   // Convert dates to Date objects if they're strings (postgres returns timestamptz as strings)
   const startDate =
@@ -149,93 +143,55 @@ async function sendTelegramMessage(
   });
 }
 
-// Fetch token metadata from API
-const tokens = await fetchTokens(0x534e5f4d41494en);
-
 const sql = postgres({
   ssl: "prefer",
   types: { bigint: postgres.BigInt },
 });
 
 try {
-  // First, check for drops with multiple tokens and throw an error if any exist
-  const multiTokenDrops = await sql<
-    {
-      drop_id: string;
-      num_tokens: number;
-      token_list: string[];
-    }[]
-  >`
-      SELECT
-        gd.id::text AS drop_id,
-        COUNT(DISTINCT c.reward_token) AS num_tokens,
-        ARRAY_AGG(DISTINCT c.reward_token::text) AS token_list
-      FROM incentives.generated_drop gd
-      JOIN incentives.generated_drop_reward_periods gdrp ON gd.id = gdrp.drop_id
-      JOIN incentives.campaign_reward_periods crp ON gdrp.campaign_reward_period_id = crp.id
-      JOIN incentives.campaigns c ON crp.campaign_id = c.id
-      WHERE gd.id NOT IN (SELECT drop_id FROM incentives.deployed_airdrop_contracts)
-      GROUP BY gd.id
-      HAVING COUNT(DISTINCT c.reward_token) > 1
-    `;
-
-  if (multiTokenDrops.length > 0) {
-    const dropDetails = multiTokenDrops
-      .map(
-        (d) =>
-          `Drop ID ${d.drop_id}: ${d.num_tokens} tokens (${d.token_list.join(", ")})`,
-      )
-      .join("\n");
-    throw new Error(
-      `Found generated drops with multiple reward tokens:\n${dropDetails}`,
-    );
-  }
-
   // Query for all generated drops that haven't been deployed yet
-  const drops = await sql<DropInfoFromDB[]>`
-      WITH drop_info AS (
-        SELECT
-          gd.id AS drop_id,
-          gd.root,
-          ARRAY_AGG(DISTINCT c.name ORDER BY c.name) AS campaign_names,
-          ARRAY_AGG(DISTINCT c.reward_token) AS reward_tokens,
-          MIN(crp.start_time) AS min_start_time,
-          MAX(crp.end_time) AS max_end_time,
-          SUM(crp.token0_reward_amount + crp.token1_reward_amount) AS period_total_amount
-        FROM incentives.generated_drop gd
-        JOIN incentives.generated_drop_reward_periods gdrp ON gd.id = gdrp.drop_id
-        JOIN incentives.campaign_reward_periods crp ON gdrp.campaign_reward_period_id = crp.id
-        JOIN incentives.campaigns c ON crp.campaign_id = c.id
-        WHERE gd.id NOT IN (SELECT drop_id FROM incentives.deployed_airdrop_contracts)
-        GROUP BY gd.id, gd.root
-      ),
-      drop_amounts AS (
-        SELECT
-          drop_id,
-          SUM(amount) AS drop_total_amount,
-          COUNT(*) AS num_addresses,
-          AVG(amount) AS avg_amount,
-          PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount DESC) AS median_amount,
-          MAX(amount) AS max_amount
-        FROM incentives.generated_drop_proof
-        GROUP BY drop_id
-      )
-      SELECT
-        di.drop_id::text,
-        di.root::text,
-        di.reward_tokens[1]::text AS reward_token,
-        di.campaign_names,
-        di.min_start_time,
-        di.max_end_time,
-        da.drop_total_amount::text,
-        di.period_total_amount::text,
-        da.num_addresses::int,
-        da.avg_amount::text,
-        da.median_amount::text,
-        da.max_amount::text
-      FROM drop_info di
-      JOIN drop_amounts da ON di.drop_id = da.drop_id
-      ORDER BY di.drop_id
+  const drops = await sql<DropInfo[]>`
+WITH drop_info AS (SELECT gd.id                                                    AS drop_id,
+                          gd.root,
+                          ARRAY_AGG(DISTINCT c.id)                                 AS campaign_ids,
+                          MIN(crp.start_time)                                      AS min_start_time,
+                          MAX(crp.end_time)                                        AS max_end_time,
+                          SUM(crp.token0_reward_amount + crp.token1_reward_amount) AS period_total_amount
+                   FROM incentives.generated_drop gd
+                            JOIN incentives.generated_drop_reward_periods gdrp ON gd.id = gdrp.drop_id
+                            JOIN incentives.campaign_reward_periods crp ON gdrp.campaign_reward_period_id = crp.id
+                            JOIN incentives.campaigns c ON crp.campaign_id = c.id
+                   WHERE gd.id NOT IN (SELECT drop_id FROM incentives.deployed_airdrop_contracts)
+                     AND gd.root NOT IN (SELECT root FROM incentives_funded)
+                   GROUP BY gd.id, gd.root),
+     drop_amounts AS (SELECT drop_id,
+                             SUM(amount)                                              AS drop_total_amount,
+                             COUNT(*)                                                 AS num_addresses,
+                             AVG(amount)                                              AS avg_amount,
+                             PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount DESC) AS median_amount,
+                             MAX(amount)                                              AS max_amount
+                      FROM incentives.generated_drop_proof
+                      GROUP BY drop_id)
+SELECT di.drop_id::TEXT,
+       di.root::TEXT,
+       c.reward_token::TEXT AS reward_token,
+       token_symbol,
+       token_decimals,
+       c.name               AS campaign_name,
+       di.min_start_time,
+       di.max_end_time,
+       da.drop_total_amount::TEXT,
+       di.period_total_amount::TEXT,
+       da.num_addresses::INT,
+       da.avg_amount::TEXT,
+       da.median_amount::TEXT,
+       da.max_amount::TEXT
+FROM drop_info di
+         JOIN drop_amounts da ON di.drop_id = da.drop_id
+         JOIN incentives.campaigns c ON di.campaign_ids[1] = c.id
+         JOIN erc20_tokens t ON t.chain_id = c.chain_id AND t.token_address = c.reward_token
+WHERE ARRAY_LENGTH(di.campaign_ids, 1) = 1
+ORDER BY di.drop_id
     `;
 
   if (drops.length === 0) {
@@ -245,36 +201,8 @@ try {
 
   console.log(`Found ${drops.length} drop(s) to deploy`);
 
-  // Build a map for efficient token lookups
-  const tokenByAddress = new Map(
-    tokens.map((t) => [BigInt(t.address).toString(), t]),
-  );
-
-  for (const dropFromDB of drops) {
-    console.log(`\nProcessing drop ID ${dropFromDB.drop_id}`);
-
-    // Get token information from map
-    const token = tokenByAddress.get(
-      BigInt(dropFromDB.reward_token).toString(),
-    );
-
-    if (!token) {
-      throw new Error(
-        `Token not found for address: ${dropFromDB.reward_token}`,
-      );
-    }
-
-    const tokenInfo = {
-      symbol: token.symbol,
-      decimals: token.decimals,
-    };
-
-    // Create enriched drop info with token metadata
-    const drop: DropInfo = {
-      ...dropFromDB,
-      token_symbol: tokenInfo.symbol,
-      token_decimals: tokenInfo.decimals,
-    };
+  for (const drop of drops) {
+    console.log(`\nProcessing drop ID ${drop.drop_id}`);
 
     const root = BigInt(drop.root);
     const distributedToken = BigInt(drop.reward_token);
