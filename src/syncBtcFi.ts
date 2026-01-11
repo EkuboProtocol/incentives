@@ -6,9 +6,7 @@ import { fetchEkuboBtcFiData } from "./util/btcFiApi.js";
 const campaignSlug = "btcfi_season";
 
 const [ekuboIncentivesData, tokens] = await Promise.all([
-  fetchEkuboBtcFiData(
-    "https://www.data-openblocklabs.com/starknet/dex-incentives/ekubo",
-  ),
+  fetchEkuboBtcFiData(),
   fetchTokens(0x534e5f4d41494en),
 ]);
 
@@ -18,32 +16,41 @@ if (tokensWithStrkSymbol.length !== 1) throw new Error("No STRK token found");
 
 const strkToken = tokensWithStrkSymbol[0];
 
-const incentiveRewardPeriodRowData = ekuboIncentivesData.items
+const incentiveRewardPeriodRowData = ekuboIncentivesData
   .map((d) => {
     try {
-      const token0 = tokens.find(
+      let token0 = tokens.find(
         (t) => BigInt(t.address) === BigInt(d.token0_address),
       );
-      const token1 = tokens.find(
+      let token1 = tokens.find(
         (t) => BigInt(t.address) === BigInt(d.token1_address),
       );
 
       if (!token0) throw new Error(`Token not found: ${d.token0_symbol}`);
       if (!token1) throw new Error(`Token not found: ${d.token1_symbol}`);
 
-      if (BigInt(token0.address) >= BigInt(token1.address)) {
-        throw new Error("Invalid sort order");
+      if (BigInt(token0.address) === BigInt(token1.address)) {
+        throw new Error("Tokens are the same");
       }
 
       const startDate = new Date(`${d.date}T00:00:00Z`);
       const endDate = new Date(startDate.getTime() + 86_400_000);
       const realizedVolatility = d.realized_volatility;
-      const token0RewardAmount = BigInt(
-        floatToRawValue(d.token0_allocation, strkToken.decimals),
+      let token0RewardAmount = BigInt(
+        floatToRawValue(Number(d.token0_allocation), strkToken.decimals),
       );
-      const token1RewardAmount = BigInt(
-        floatToRawValue(d.token1_allocation, strkToken.decimals),
+      let token1RewardAmount = BigInt(
+        floatToRawValue(Number(d.token1_allocation), strkToken.decimals),
       );
+
+      if (BigInt(token0.address) > BigInt(token1.address)) {
+        [token0, token1, token0RewardAmount, token1RewardAmount] = [
+          token1,
+          token0,
+          token1RewardAmount,
+          token0RewardAmount,
+        ];
+      }
 
       return {
         token0,
