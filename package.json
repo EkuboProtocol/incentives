@@ -2,7 +2,6 @@
   "name": "defi-spring",
   "version": "1.0.0",
   "scripts": {
-    "sync-defi-spring": "bun src/syncDefiSpring.ts",
     "sync-btcfi": "bun src/syncBtcFi.ts",
     "deploy-airdrop-contract": "bun src/deployAirdropContract.ts",
     "generate-drop": "bun src/generateDrop.ts",
