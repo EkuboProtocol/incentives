@@ -28,7 +28,7 @@ export const INCENTIVES_ABI = [
       {
         name: "c",
         type: "tuple",
-        internalType: "struct Claim",
+        internalType: "struct ClaimKey",
         components: [
           {
             name: "index",
@@ -55,30 +55,6 @@ export const INCENTIVES_ABI = [
     ],
     outputs: [],
     stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "claimed",
-    inputs: [
-      {
-        name: "id",
-        type: "bytes32",
-        internalType: "bytes32",
-      },
-      {
-        name: "",
-        type: "uint256",
-        internalType: "uint256",
-      },
-    ],
-    outputs: [
-      {
-        name: "",
-        type: "uint256",
-        internalType: "Bitmap",
-      },
-    ],
-    stateMutability: "view",
   },
   {
     type: "function",
@@ -120,129 +96,6 @@ export const INCENTIVES_ABI = [
       },
     ],
     stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "getRemaining",
-    inputs: [
-      {
-        name: "key",
-        type: "tuple",
-        internalType: "struct DropKey",
-        components: [
-          {
-            name: "owner",
-            type: "address",
-            internalType: "address",
-          },
-          {
-            name: "token",
-            type: "address",
-            internalType: "address",
-          },
-          {
-            name: "root",
-            type: "bytes32",
-            internalType: "bytes32",
-          },
-        ],
-      },
-    ],
-    outputs: [
-      {
-        name: "",
-        type: "uint128",
-        internalType: "uint128",
-      },
-    ],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
-    name: "isAvailable",
-    inputs: [
-      {
-        name: "key",
-        type: "tuple",
-        internalType: "struct DropKey",
-        components: [
-          {
-            name: "owner",
-            type: "address",
-            internalType: "address",
-          },
-          {
-            name: "token",
-            type: "address",
-            internalType: "address",
-          },
-          {
-            name: "root",
-            type: "bytes32",
-            internalType: "bytes32",
-          },
-        ],
-      },
-      {
-        name: "index",
-        type: "uint256",
-        internalType: "uint256",
-      },
-      {
-        name: "amount",
-        type: "uint128",
-        internalType: "uint128",
-      },
-    ],
-    outputs: [
-      {
-        name: "",
-        type: "bool",
-        internalType: "bool",
-      },
-    ],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
-    name: "isClaimed",
-    inputs: [
-      {
-        name: "key",
-        type: "tuple",
-        internalType: "struct DropKey",
-        components: [
-          {
-            name: "owner",
-            type: "address",
-            internalType: "address",
-          },
-          {
-            name: "token",
-            type: "address",
-            internalType: "address",
-          },
-          {
-            name: "root",
-            type: "bytes32",
-            internalType: "bytes32",
-          },
-        ],
-      },
-      {
-        name: "index",
-        type: "uint256",
-        internalType: "uint256",
-      },
-    ],
-    outputs: [
-      {
-        name: "",
-        type: "bool",
-        internalType: "bool",
-      },
-    ],
-    stateMutability: "view",
   },
   {
     type: "function",
@@ -298,6 +151,20 @@ export const INCENTIVES_ABI = [
       },
     ],
     stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "sload",
+    inputs: [],
+    outputs: [],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "tload",
+    inputs: [],
+    outputs: [],
+    stateMutability: "view",
   },
   {
     type: "event",
