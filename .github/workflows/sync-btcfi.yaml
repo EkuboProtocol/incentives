@@ -29,5 +29,5 @@ jobs:
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           PGSSLMODE: require
           NODE_TLS_REJECT_UNAUTHORIZED: 0
-
+        timeout-minutes: 1
         run: bun sync-btcfi
