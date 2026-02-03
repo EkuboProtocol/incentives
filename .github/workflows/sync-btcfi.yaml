@@ -2,13 +2,14 @@ name: Sync BTCFI
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "0 */4 * * *"
 
 concurrency: sync-btcfi
 
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 1
     name: Run
     steps:
       - name: Checkout
@@ -29,5 +30,4 @@ jobs:
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           PGSSLMODE: require
           NODE_TLS_REJECT_UNAUTHORIZED: 0
-        timeout-minutes: 1
         run: bun sync-btcfi
