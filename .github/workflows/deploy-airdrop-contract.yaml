@@ -1,6 +1,8 @@
 name: Deploy airdrop contract
 
 on:
+  schedule:
+    - cron: "15 3,6,9,12 * * *"
   workflow_dispatch:
 
 concurrency: deploy-drop
