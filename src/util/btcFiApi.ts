@@ -1,5 +1,5 @@
 export function fetchEkuboBtcFiData(
-  baseApiUrl: string = "https://5xyjxn0qoe.execute-api.eu-west-1.amazonaws.com/prod/dex-pairs",
+  baseApiUrl: string = "https://btcfi-season-api.starknet.org/dex-pairs",
   page: number = 1,
   size: number = 1000,
 ): Promise<
