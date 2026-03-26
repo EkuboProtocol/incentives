@@ -2,6 +2,7 @@ import { Allocation } from "./util/airdrop.js";
 import { generateAndInsertDrop } from "./util/generateAndInsertDrop.js";
 import postgres from "postgres";
 import { EVM_AIRDROP_CONTRACT_OPTIONS } from "./util/evmAirdropContract.js";
+import { NUMERIC_INTEGER_TYPE } from "./util/postgres.js";
 import { STARKNET_AIRDROP_CONTRACT_OPTIONS } from "./util/starknetAirdropContract.js";
 
 const AIRDROP_CONTRACT_OPTIONS_BY_CHAIN_ID = {
@@ -9,29 +10,9 @@ const AIRDROP_CONTRACT_OPTIONS_BY_CHAIN_ID = {
   ["1"]: EVM_AIRDROP_CONTRACT_OPTIONS,
 };
 
-const NumericIntegerType: postgres.PostgresType<bigint> = {
-  from: [1700],
-  to: 1700,
-  parse(v: string) {
-    try {
-      return BigInt(v);
-    } catch (e) {
-      throw new Error(`Failed to parse numeric integer type: "${v}"`);
-    }
-  },
-  serialize(v: any) {
-    if (typeof v === "string") {
-      return v;
-    }
-    if (typeof v !== "bigint")
-      throw new Error(`Unexpected numeric integer type: "${v}"`);
-    return v.toString();
-  },
-};
-
 const sql = postgres({
   ssl: "prefer",
-  types: { bigint: postgres.BigInt, numeric: NumericIntegerType },
+  types: { bigint: postgres.BigInt, numeric: NUMERIC_INTEGER_TYPE },
 });
 
 try {
