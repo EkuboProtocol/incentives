@@ -1,0 +1,77 @@
+name: Generate staker rewards drop
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: "Start timestamp passed to calculate_staker_rewards"
+        required: true
+        type: string
+      end_date:
+        description: "End timestamp passed to calculate_staker_rewards"
+        required: true
+        type: string
+      amount:
+        description: "Total rewards amount as numeric string"
+        required: true
+        type: string
+      staker_share:
+        description: "Staker share as integer percent"
+        required: true
+        type: string
+      delegate_share:
+        description: "Delegate share as integer percent"
+        required: true
+        type: string
+      reward_token:
+        description: "Reward token felt/address"
+        required: true
+        type: string
+      chain_id:
+        description: "Target chain id"
+        required: false
+        default: "23448594291968334"
+        type: string
+      airdrop_class_hash:
+        description: "Override Starknet airdrop class hash"
+        required: false
+        default: "0x01cb5e128a81be492ee7b78cf4ba4849cb35f311508e13a558755f4549839f14"
+        type: string
+
+concurrency: generate-staker-rewards-drop
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    name: Run
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install
+
+      - name: Generate staker rewards drop
+        env:
+          PGHOST: ${{ secrets.POSTGRES_HOST }}
+          PGPORT: ${{ secrets.POSTGRES_PORT }}
+          PGDATABASE: ${{ secrets.POSTGRES_DATABASE }}
+          PGUSER: ${{ secrets.POSTGRES_USERNAME }}
+          PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          PGSSLMODE: require
+          NODE_TLS_REJECT_UNAUTHORIZED: 0
+          ACCOUNT_ADDRESS: ${{ secrets.DEPLOYMENT_ACCOUNT_ADDRESS }}
+          PRIVATE_KEY: ${{ secrets.DEPLOYMENT_PRIVATE_KEY }}
+          NODE_URL: ${{ secrets.DEPLOYMENT_NODE_URL }}
+          START_DATE: ${{ inputs.start_date }}
+          END_DATE: ${{ inputs.end_date }}
+          AMOUNT: ${{ inputs.amount }}
+          STAKER_SHARE: ${{ inputs.staker_share }}
+          DELEGATE_SHARE: ${{ inputs.delegate_share }}
+          REWARD_TOKEN: ${{ inputs.reward_token }}
+          CHAIN_ID: ${{ inputs.chain_id }}
+          AIRDROP_CLASS_HASH: ${{ inputs.airdrop_class_hash }}
+        run: bun generate-staker-rewards-drop

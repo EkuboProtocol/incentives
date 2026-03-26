@@ -5,6 +5,7 @@
     "sync-btcfi": "bun src/syncBtcFi.ts",
     "deploy-airdrop-contract": "bun src/deployAirdropContract.ts",
     "generate-drop": "bun src/generateDrop.ts",
+    "generate-staker-rewards-drop": "bun src/generate-staker-rewards-drop.ts",
     "fund-drops": "bun src/fundDrops.ts",
     "format": "prettier --write '**/*.{js,ts,tsx,json,md,yml,yaml}'",
     "format:check": "prettier --check '**/*.{js,ts,tsx,json,md,yml,yaml}'"

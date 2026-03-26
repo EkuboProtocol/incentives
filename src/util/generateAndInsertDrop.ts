@@ -12,18 +12,18 @@ export interface GenerateAndInsertDropOptions {
   siblingHashFunction: SiblingHashFunction;
 }
 
-export async function generateAndInsertDrop(
+export async function generateAndInsertClaimsDrop(
   sql: Sql<{ bigint: bigint; numeric: bigint }>,
-  allocations: Allocation[],
+  claims: Claim[],
   rewardPeriodIds: (string | bigint)[],
   options: GenerateAndInsertDropOptions,
 ): Promise<number> {
-  const claimsWithHashes: { claim: Claim; hash: bigint }[] = allocations
-    .map((allocation, ix): Claim => ({ id: ix, ...allocation }))
-    .map((claim) => ({
+  const claimsWithHashes: { claim: Claim; hash: bigint }[] = claims.map(
+    (claim) => ({
       claim,
       hash: options.claimHashFunction(claim),
-    }));
+    }),
+  );
 
   // Example usage:
   const { root, layers } = constructMerkleTree(
@@ -65,4 +65,18 @@ export async function generateAndInsertDrop(
   }
 
   return dropId;
+}
+
+export async function generateAndInsertDrop(
+  sql: Sql<{ bigint: bigint; numeric: bigint }>,
+  allocations: Allocation[],
+  rewardPeriodIds: (string | bigint)[],
+  options: GenerateAndInsertDropOptions,
+): Promise<number> {
+  return generateAndInsertClaimsDrop(
+    sql,
+    allocations.map((allocation, ix): Claim => ({ id: ix, ...allocation })),
+    rewardPeriodIds,
+    options,
+  );
 }
