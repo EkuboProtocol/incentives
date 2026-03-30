@@ -40,13 +40,16 @@ function parseEnvBigInt(name: string, defaultValue?: bigint): bigint {
   }
 }
 
-function parseEnvInteger(name: string): number {
+function parseEnvInteger(name: string): bigint {
   const value = getRequiredEnv(name);
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed)) {
+  if (!/^-?\d+$/.test(value)) {
     throw new Error(`${name} must be an integer`);
   }
-  return parsed;
+  try {
+    return BigInt(value);
+  } catch {
+    throw new Error(`${name} must be an integer`);
+  }
 }
 
 const startDate = getRequiredEnv("START_DATE");
@@ -62,7 +65,7 @@ const accountAddress = process.env.ACCOUNT_ADDRESS;
 const privateKey = process.env.PRIVATE_KEY;
 const nodeUrl = process.env.NODE_URL;
 
-if (stakerShare < 0 || delegateShare < 0) {
+if (stakerShare < 0n || delegateShare < 0n) {
   throw new Error("STAKER_SHARE and DELEGATE_SHARE must be non-negative");
 }
 
