@@ -10,6 +10,15 @@
  */
 
 const TRANSIENT_RPC_CODES = new Set([-32001, -32029]);
+// starknet.js sometimes wraps the underlying RPC failure in a LibraryError
+// (e.g. tip analysis during fee estimation), hiding the code, so also match
+// on the message text.
+const TRANSIENT_MESSAGE_FRAGMENTS = [
+  "-32001",
+  "-32029",
+  "Unable to complete request",
+  "Too Many Requests",
+];
 const DEFAULT_ATTEMPTS = 5;
 const DEFAULT_INITIAL_DELAY_MS = 2000;
 const UNSUPPORTED_SPEC_MESSAGE =
@@ -26,8 +35,13 @@ function isTransientRpcError(error: unknown): boolean {
   // in some versions, or as `Error("Unable to connect. ...")` in v10+.
   if (error instanceof TypeError) return true;
   const message = (error as { message?: unknown }).message;
-  if (typeof message === "string" && message.startsWith("Unable to connect")) {
-    return true;
+  if (typeof message === "string") {
+    if (message.startsWith("Unable to connect")) return true;
+    if (
+      TRANSIENT_MESSAGE_FRAGMENTS.some((fragment) => message.includes(fragment))
+    ) {
+      return true;
+    }
   }
   if ((error as { name?: unknown }).name === "TimeoutError") return true;
   return TRANSIENT_RPC_CODES.has((error as { code?: unknown }).code as number);
