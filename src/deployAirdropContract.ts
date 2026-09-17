@@ -1,6 +1,7 @@
 import { Account, RpcProvider } from "starknet";
 import TelegramBot from "node-telegram-bot-api";
 import postgres from "postgres";
+import { withRpcRetry } from "./util/rpcRetry.js";
 
 // Environment variables for Telegram
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -17,7 +18,11 @@ if (!accountAddress || !privateKey || !nodeUrl) {
   throw new Error("Missing ACCOUNT_ADDRESS, PRIVATE_KEY, or NODE_URL");
 }
 
-const provider = new RpcProvider({ nodeUrl });
+// Query the latest block instead of starknet.js's default (pending): the RPC
+// node intermittently answers pending-block reads such as starknet_getNonce
+// with `-32001: Unable to complete request at this time`, which failed the
+// scheduled deploy job.
+const provider = new RpcProvider({ nodeUrl, blockIdentifier: "latest" });
 
 const deployerAccount = new Account(provider, accountAddress, privateKey);
 
@@ -217,12 +222,16 @@ ORDER BY di.drop_id
       constructorCalldata,
     );
 
-    const deployResponse = await deployerAccount.deployContract({
-      classHash: airdropClassHash,
-      constructorCalldata,
-    });
+    const deployResponse = await withRpcRetry(() =>
+      deployerAccount.deployContract({
+        classHash: airdropClassHash,
+        constructorCalldata,
+      }),
+    );
 
-    await provider.waitForTransaction(deployResponse.transaction_hash);
+    await withRpcRetry(() =>
+      provider.waitForTransaction(deployResponse.transaction_hash),
+    );
 
     console.log("Deployed airdrop");
     console.log("Contract address:", deployResponse.contract_address);

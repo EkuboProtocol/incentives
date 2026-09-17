@@ -1,5 +1,6 @@
 import { Account, RpcProvider } from "starknet";
 import postgres from "postgres";
+import { withRpcRetry } from "./util/rpcRetry.js";
 import { generateAndInsertClaimsDrop } from "./util/generateAndInsertDrop.js";
 import { Claim } from "./util/airdrop.js";
 import { NUMERIC_INTEGER_TYPE } from "./util/postgres.js";
@@ -81,7 +82,10 @@ const sql = postgres({
   },
 });
 
-const provider = new RpcProvider({ nodeUrl });
+// Query the latest block instead of starknet.js's default (pending): the RPC
+// node intermittently answers pending-block reads such as starknet_getNonce
+// with `-32001: Unable to complete request at this time`.
+const provider = new RpcProvider({ nodeUrl, blockIdentifier: "latest" });
 const deployerAccount = new Account(provider, accountAddress, privateKey);
 
 try {
@@ -145,16 +149,20 @@ try {
 
   console.log(`Created generated drop ${dropId}`);
 
-  const deployResponse = await deployerAccount.deployContract({
-    classHash: airdropClassHash,
-    constructorCalldata,
-  });
+  const deployResponse = await withRpcRetry(() =>
+    deployerAccount.deployContract({
+      classHash: airdropClassHash,
+      constructorCalldata,
+    }),
+  );
 
   console.log(
     `Submitted deployment tx ${deployResponse.transaction_hash} for drop ${dropId}`,
   );
 
-  await provider.waitForTransaction(deployResponse.transaction_hash);
+  await withRpcRetry(() =>
+    provider.waitForTransaction(deployResponse.transaction_hash),
+  );
 
   await sql`
       INSERT INTO incentives.deployed_airdrop_contracts (chain_id, address, token, drop_id)
