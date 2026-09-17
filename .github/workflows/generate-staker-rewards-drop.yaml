@@ -66,6 +66,7 @@ jobs:
           ACCOUNT_ADDRESS: ${{ secrets.DEPLOYMENT_ACCOUNT_ADDRESS }}
           PRIVATE_KEY: ${{ secrets.DEPLOYMENT_PRIVATE_KEY }}
           NODE_URL: ${{ secrets.DEPLOYMENT_NODE_URL }}
+          FALLBACK_NODE_URL: ${{ secrets.FALLBACK_NODE_URL }}
           START_DATE: ${{ inputs.start_date }}
           END_DATE: ${{ inputs.end_date }}
           AMOUNT: ${{ inputs.amount }}
