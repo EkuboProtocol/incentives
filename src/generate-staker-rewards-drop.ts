@@ -1,6 +1,10 @@
 import { Account, RpcProvider } from "starknet";
 import postgres from "postgres";
-import { withRpcRetry } from "./util/rpcRetry.js";
+import {
+  getNodeUrls,
+  withEndpointFailover,
+  withRpcRetry,
+} from "./util/rpcRetry.js";
 import { generateAndInsertClaimsDrop } from "./util/generateAndInsertDrop.js";
 import { Claim } from "./util/airdrop.js";
 import { NUMERIC_INTEGER_TYPE } from "./util/postgres.js";
@@ -64,14 +68,13 @@ const airdropClassHash =
   process.env.AIRDROP_CLASS_HASH ?? DEFAULT_AIRDROP_CLASS_HASH;
 const accountAddress = process.env.ACCOUNT_ADDRESS;
 const privateKey = process.env.PRIVATE_KEY;
-const nodeUrl = process.env.NODE_URL;
 
 if (stakerShare < 0n || delegateShare < 0n) {
   throw new Error("STAKER_SHARE and DELEGATE_SHARE must be non-negative");
 }
 
-if (!accountAddress || !privateKey || !nodeUrl) {
-  throw new Error("Missing ACCOUNT_ADDRESS, PRIVATE_KEY, or NODE_URL");
+if (!accountAddress || !privateKey) {
+  throw new Error("Missing ACCOUNT_ADDRESS or PRIVATE_KEY");
 }
 
 const sql = postgres({
@@ -82,11 +85,22 @@ const sql = postgres({
   },
 });
 
-// Query the latest block instead of starknet.js's default (pending): the RPC
-// node intermittently answers pending-block reads such as starknet_getNonce
-// with `-32001: Unable to complete request at this time`.
-const provider = new RpcProvider({ nodeUrl, blockIdentifier: "latest" });
-const deployerAccount = new Account(provider, accountAddress, privateKey);
+// Ordered RPC endpoints (primary first, public fallback last). Query the
+// latest block instead of starknet.js's default (pending): nodes answer
+// pending-block reads such as starknet_getNonce with `-32001: Unable to
+// complete request at this time` far more often.
+const nodeUrls = getNodeUrls();
+
+function createDeployer(nodeUrl: string): {
+  provider: RpcProvider;
+  account: Account;
+} {
+  const provider = new RpcProvider({ nodeUrl, blockIdentifier: "latest" });
+  return {
+    provider,
+    account: new Account(provider, accountAddress, privateKey),
+  };
+}
 
 try {
   const rewards = await sql<ClaimRow[]>`
@@ -149,19 +163,22 @@ try {
 
   console.log(`Created generated drop ${dropId}`);
 
-  const deployResponse = await withRpcRetry(() =>
-    deployerAccount.deployContract({
-      classHash: airdropClassHash,
-      constructorCalldata,
-    }),
-  );
+  const deployResponse = await withEndpointFailover(nodeUrls, async (url) => {
+    const { provider, account } = createDeployer(url);
+    const response = await withRpcRetry(() =>
+      account.deployContract({
+        classHash: airdropClassHash,
+        constructorCalldata,
+      }),
+    );
+    await withRpcRetry(() =>
+      provider.waitForTransaction(response.transaction_hash),
+    );
+    return response;
+  });
 
   console.log(
     `Submitted deployment tx ${deployResponse.transaction_hash} for drop ${dropId}`,
-  );
-
-  await withRpcRetry(() =>
-    provider.waitForTransaction(deployResponse.transaction_hash),
   );
 
   await sql`

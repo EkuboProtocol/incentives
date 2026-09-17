@@ -19,7 +19,8 @@ Automatically deploys airdrop contracts for all generated drops that haven't bee
 
 - `ACCOUNT_ADDRESS` - Starknet account address for deployment (required)
 - `PRIVATE_KEY` - Private key for the deployment account (required)
-- `NODE_URL` - Starknet RPC node URL (required)
+- `NODE_URL` - Starknet RPC node URL (required, comma-separated list supported, tried in order)
+- `FALLBACK_NODE_URL` - Additional Starknet RPC URL(s) tried when `NODE_URL` is down (optional, comma-separated list supported; a keyless public endpoint is used as a last resort when unset)
 - `TELEGRAM_BOT_TOKEN` - Telegram bot token for notifications (optional)
 - `TELEGRAM_CHAT_ID` - Telegram chat ID to send notifications to (optional)
 - Database connection variables: `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`

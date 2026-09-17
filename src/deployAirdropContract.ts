@@ -1,7 +1,11 @@
 import { Account, RpcProvider } from "starknet";
 import TelegramBot from "node-telegram-bot-api";
 import postgres from "postgres";
-import { withRpcRetry } from "./util/rpcRetry.js";
+import {
+  getNodeUrls,
+  withEndpointFailover,
+  withRpcRetry,
+} from "./util/rpcRetry.js";
 
 // Environment variables for Telegram
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -10,21 +14,29 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 // Starknet deployment configuration
 const accountAddress = process.env.ACCOUNT_ADDRESS;
 const privateKey = process.env.PRIVATE_KEY;
-const nodeUrl = process.env.NODE_URL;
 
 if (!TELEGRAM_BOT_TOKEN) throw new Error("Missing TELEGRAM_BOT_TOKEN");
 
-if (!accountAddress || !privateKey || !nodeUrl) {
-  throw new Error("Missing ACCOUNT_ADDRESS, PRIVATE_KEY, or NODE_URL");
+if (!accountAddress || !privateKey) {
+  throw new Error("Missing ACCOUNT_ADDRESS or PRIVATE_KEY");
 }
 
-// Query the latest block instead of starknet.js's default (pending): the RPC
-// node intermittently answers pending-block reads such as starknet_getNonce
-// with `-32001: Unable to complete request at this time`, which failed the
-// scheduled deploy job.
-const provider = new RpcProvider({ nodeUrl, blockIdentifier: "latest" });
+// Ordered RPC endpoints (primary first, public fallback last). Query the
+// latest block instead of starknet.js's default (pending): nodes answer
+// pending-block reads such as starknet_getNonce with `-32001: Unable to
+// complete request at this time` far more often.
+const nodeUrls = getNodeUrls();
 
-const deployerAccount = new Account(provider, accountAddress, privateKey);
+function createDeployer(nodeUrl: string): {
+  provider: RpcProvider;
+  account: Account;
+} {
+  const provider = new RpcProvider({ nodeUrl, blockIdentifier: "latest" });
+  return {
+    provider,
+    account: new Account(provider, accountAddress, privateKey),
+  };
+}
 
 const airdropClassHash =
   "0x01cb5e128a81be492ee7b78cf4ba4849cb35f311508e13a558755f4549839f14";
@@ -222,16 +234,19 @@ ORDER BY di.drop_id
       constructorCalldata,
     );
 
-    const deployResponse = await withRpcRetry(() =>
-      deployerAccount.deployContract({
-        classHash: airdropClassHash,
-        constructorCalldata,
-      }),
-    );
-
-    await withRpcRetry(() =>
-      provider.waitForTransaction(deployResponse.transaction_hash),
-    );
+    const deployResponse = await withEndpointFailover(nodeUrls, async (url) => {
+      const { provider, account } = createDeployer(url);
+      const response = await withRpcRetry(() =>
+        account.deployContract({
+          classHash: airdropClassHash,
+          constructorCalldata,
+        }),
+      );
+      await withRpcRetry(() =>
+        provider.waitForTransaction(response.transaction_hash),
+      );
+      return response;
+    });
 
     console.log("Deployed airdrop");
     console.log("Contract address:", deployResponse.contract_address);

@@ -1,23 +1,61 @@
 /**
- * Retry helper for transient Starknet RPC failures.
+ * Retry and failover helpers for Starknet RPC calls.
  *
- * The deploy workflows intermittently fail with `-32001: Unable to complete
- * request at this time` from the RPC node (observed on `starknet_getNonce`
- * with the `pending` block). These errors happen before a transaction is
- * broadcast, so retrying the operation is safe.
+ * The deploy workflows failed with `-32001: Unable to complete request at
+ * this time` from the primary RPC node, persistently (not just on the
+ * `pending` block), so reads are retried and, if the endpoint stays down,
+ * the operation fails over to the next configured endpoint.
  */
 
-const TRANSIENT_RPC_CODE = -32001;
+const TRANSIENT_RPC_CODES = new Set([-32001, -32029]);
 const DEFAULT_ATTEMPTS = 5;
 const DEFAULT_INITIAL_DELAY_MS = 2000;
 
+// Keyless public endpoint used as a last resort when every configured
+// endpoint is down. Quota is tight, so it is only ever tried after the
+// configured endpoints have been exhausted.
+const PUBLIC_FALLBACK_NODE_URL = "https://starknet.api.onfinality.io/public";
+
 function isTransientRpcError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
-  return (error as { code?: unknown }).code === TRANSIENT_RPC_CODE;
+  // Transport failures (connection refused, DNS, TLS) surface as TypeError.
+  if (error instanceof TypeError) return true;
+  if ((error as { name?: unknown }).name === "TimeoutError") return true;
+  return TRANSIENT_RPC_CODES.has((error as { code?: unknown }).code as number);
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function appendUrls(target: string[], raw: string | undefined): void {
+  for (const part of (raw ?? "").split(",")) {
+    const url = part.trim();
+    if (url && !target.includes(url)) target.push(url);
+  }
+}
+
+/**
+ * Ordered RPC endpoints: NODE_URL first, then FALLBACK_NODE_URL, then the
+ * built-in public fallback. Both env vars accept comma-separated lists.
+ */
+export function getNodeUrls(): string[] {
+  const urls: string[] = [];
+  appendUrls(urls, process.env.NODE_URL);
+  appendUrls(urls, process.env.FALLBACK_NODE_URL);
+  if (urls.length === 0) {
+    throw new Error("Missing NODE_URL or FALLBACK_NODE_URL");
+  }
+  appendUrls(urls, PUBLIC_FALLBACK_NODE_URL);
+  return urls;
+}
+
+function hostnameForLog(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "configured endpoint";
+  }
 }
 
 export async function withRpcRetry<T>(
@@ -37,4 +75,36 @@ export async function withRpcRetry<T>(
       delayMs *= 2;
     }
   }
+}
+
+/**
+ * Runs `run` against each endpoint in order, failing over to the next one
+ * when the current one keeps returning transient RPC errors. Non-transient
+ * errors are rethrown immediately without trying further endpoints.
+ *
+ * Note: if a transaction was already broadcast on a failing endpoint (e.g.
+ * the confirmation poll failed), failing over can broadcast it a second
+ * time. The duplicate contract is inert (funding matches drops by root),
+ * so availability is worth the trade-off.
+ */
+export async function withEndpointFailover<T>(
+  urls: string[],
+  run: (nodeUrl: string) => Promise<T>,
+): Promise<T> {
+  let lastError: unknown = null;
+  for (const url of urls) {
+    try {
+      if (urls.length > 1) {
+        console.log(`Using Starknet RPC ${hostnameForLog(url)}`);
+      }
+      return await run(url);
+    } catch (error) {
+      lastError = error;
+      if (!isTransientRpcError(error)) throw error;
+      console.warn(
+        `Endpoint ${hostnameForLog(url)} keeps failing, failing over`,
+      );
+    }
+  }
+  throw lastError;
 }
