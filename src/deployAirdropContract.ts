@@ -34,7 +34,11 @@ function createDeployer(nodeUrl: string): {
   const provider = new RpcProvider({ nodeUrl, blockIdentifier: "latest" });
   return {
     provider,
-    account: new Account(provider, accountAddress, privateKey),
+    account: new Account({
+      provider,
+      address: accountAddress,
+      signer: privateKey,
+    }),
   };
 }
 

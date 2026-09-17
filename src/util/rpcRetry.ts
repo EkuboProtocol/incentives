@@ -4,12 +4,16 @@
  * The deploy workflows failed with `-32001: Unable to complete request at
  * this time` from the primary RPC node, persistently (not just on the
  * `pending` block), so reads are retried and, if the endpoint stays down,
- * the operation fails over to the next configured endpoint.
+ * the operation fails over to the next configured endpoint. Endpoints may
+ * also serve different RPC spec versions (0.9 vs 0.10), so a node whose spec
+ * the client cannot speak is skipped the same way.
  */
 
 const TRANSIENT_RPC_CODES = new Set([-32001, -32029]);
 const DEFAULT_ATTEMPTS = 5;
 const DEFAULT_INITIAL_DELAY_MS = 2000;
+const UNSUPPORTED_SPEC_MESSAGE =
+  "specification version is not supported by this library";
 
 // Keyless public endpoint used as a last resort when every configured
 // endpoint is down. Quota is tight, so it is only ever tried after the
@@ -18,10 +22,27 @@ const PUBLIC_FALLBACK_NODE_URL = "https://starknet.api.onfinality.io/public";
 
 function isTransientRpcError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
-  // Transport failures (connection refused, DNS, TLS) surface as TypeError.
+  // Transport failures (connection refused, DNS, TLS) surface as TypeError
+  // in some versions, or as `Error("Unable to connect. ...")` in v10+.
   if (error instanceof TypeError) return true;
+  const message = (error as { message?: unknown }).message;
+  if (typeof message === "string" && message.startsWith("Unable to connect")) {
+    return true;
+  }
   if ((error as { name?: unknown }).name === "TimeoutError") return true;
   return TRANSIENT_RPC_CODES.has((error as { code?: unknown }).code as number);
+}
+
+function isUnsupportedSpecError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const message = (error as { message?: unknown }).message;
+  return (
+    typeof message === "string" && message.includes(UNSUPPORTED_SPEC_MESSAGE)
+  );
+}
+
+function isFailoverError(error: unknown): boolean {
+  return isTransientRpcError(error) || isUnsupportedSpecError(error);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -79,8 +100,9 @@ export async function withRpcRetry<T>(
 
 /**
  * Runs `run` against each endpoint in order, failing over to the next one
- * when the current one keeps returning transient RPC errors. Non-transient
- * errors are rethrown immediately without trying further endpoints.
+ * when the current one keeps returning transient RPC errors or serves an RPC
+ * spec version the client cannot speak. Non-transient errors are rethrown
+ * immediately without trying further endpoints.
  *
  * Note: if a transaction was already broadcast on a failing endpoint (e.g.
  * the confirmation poll failed), failing over can broadcast it a second
@@ -100,7 +122,7 @@ export async function withEndpointFailover<T>(
       return await run(url);
     } catch (error) {
       lastError = error;
-      if (!isTransientRpcError(error)) throw error;
+      if (!isFailoverError(error)) throw error;
       console.warn(
         `Endpoint ${hostnameForLog(url)} keeps failing, failing over`,
       );
