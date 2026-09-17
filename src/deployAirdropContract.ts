@@ -39,6 +39,9 @@ function createDeployer(nodeUrl: string): {
       provider,
       address: accountAddress,
       signer: privateKey,
+      // The deployer is a Cairo 1 OZ account; skip version auto-detection
+      // (extra getClassAt calls) on quota-limited endpoints.
+      cairoVersion: "1",
     }),
   };
 }
