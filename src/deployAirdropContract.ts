@@ -2,6 +2,7 @@ import { Account, RpcProvider } from "starknet";
 import TelegramBot from "node-telegram-bot-api";
 import postgres from "postgres";
 import {
+  DEPLOY_DETAILS,
   getNodeUrls,
   withEndpointFailover,
   withRpcRetry,
@@ -241,13 +242,18 @@ ORDER BY di.drop_id
     const deployResponse = await withEndpointFailover(nodeUrls, async (url) => {
       const { provider, account } = createDeployer(url);
       const response = await withRpcRetry(() =>
-        account.deployContract({
-          classHash: airdropClassHash,
-          constructorCalldata,
-        }),
+        account.deployContract(
+          {
+            classHash: airdropClassHash,
+            constructorCalldata,
+          },
+          DEPLOY_DETAILS,
+        ),
       );
       await withRpcRetry(() =>
-        provider.waitForTransaction(response.transaction_hash),
+        provider.waitForTransaction(response.transaction_hash, {
+          retryInterval: DEPLOY_DETAILS.retryInterval,
+        }),
       );
       return response;
     });
