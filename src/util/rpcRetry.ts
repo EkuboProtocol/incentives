@@ -24,6 +24,14 @@ const DEFAULT_INITIAL_DELAY_MS = 2000;
 const UNSUPPORTED_SPEC_MESSAGE =
   "specification version is not supported by this library";
 
+/**
+ * Fee/confirmation options for airdrop deploys. starknet.js v10 analyzes
+ * recent-block tips (several heavy getBlockWithTxs calls) unless a tip is
+ * given; tip 0 matches pre-v10 behavior. Confirmation polls are paced at
+ * 15s so fragile quota-limited endpoints are not rate-limited by the wait.
+ */
+export const DEPLOY_DETAILS = { tip: 0, retryInterval: 15_000 };
+
 // Keyless public endpoint used as a last resort when every configured
 // endpoint is down. Quota is tight, so it is only ever tried after the
 // configured endpoints have been exhausted.
