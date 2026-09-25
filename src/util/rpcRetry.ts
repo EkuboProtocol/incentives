@@ -1,12 +1,10 @@
 /**
- * Retry and failover helpers for Starknet RPC calls.
+ * Retry helper for Starknet RPC calls against the configured Alchemy node.
  *
- * The deploy workflows failed with `-32001: Unable to complete request at
- * this time` from the primary RPC node, persistently (not just on the
- * `pending` block), so reads are retried and, if the endpoint stays down,
- * the operation fails over to the next configured endpoint. Endpoints may
- * also serve different RPC spec versions (0.9 vs 0.10), so a node whose spec
- * the client cannot speak is skipped the same way.
+ * Reads are retried with backoff because the node can fail transiently
+ * (`-32001: Unable to complete request at this time`, `-32029: Too Many
+ * Requests`, transport blips). Every retry logs the underlying error code
+ * and message so the next failure is diagnosable from the run log.
  */
 
 const TRANSIENT_RPC_CODES = new Set([-32001, -32029]);
@@ -31,11 +29,6 @@ const UNSUPPORTED_SPEC_MESSAGE =
  * 15s so fragile quota-limited endpoints are not rate-limited by the wait.
  */
 export const DEPLOY_DETAILS = { tip: 0, retryInterval: 15_000 };
-
-// Keyless public endpoint used as a last resort when every configured
-// endpoint is down. Quota is tight, so it is only ever tried after the
-// configured endpoints have been exhausted.
-const PUBLIC_FALLBACK_NODE_URL = "https://starknet.api.onfinality.io/public";
 
 function isTransientRpcError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
@@ -79,8 +72,8 @@ function appendUrls(target: string[], raw: string | undefined): void {
 }
 
 /**
- * Ordered RPC endpoints: NODE_URL first, then FALLBACK_NODE_URL, then the
- * built-in public fallback. Both env vars accept comma-separated lists.
+ * Ordered RPC endpoints: NODE_URL first, then FALLBACK_NODE_URL. Both env
+ * vars accept comma-separated lists.
  */
 export function getNodeUrls(): string[] {
   const urls: string[] = [];
@@ -89,7 +82,6 @@ export function getNodeUrls(): string[] {
   if (urls.length === 0) {
     throw new Error("Missing NODE_URL or FALLBACK_NODE_URL");
   }
-  appendUrls(urls, PUBLIC_FALLBACK_NODE_URL);
   return urls;
 }
 
@@ -99,6 +91,19 @@ function hostnameForLog(url: string): string {
   } catch {
     return "configured endpoint";
   }
+}
+
+// One-line error summary for retry/failover warnings. The Sep 24 deploy
+// failure showed the primary node failing five times with no record of what
+// it actually returned, so the code, if any, is always logged now.
+function errorSummary(error: unknown): string {
+  if (typeof error !== "object" || error === null) return "unknown error";
+  const code = (error as { code?: unknown }).code;
+  const prefix =
+    typeof code === "number" || typeof code === "string" ? `${code}: ` : "";
+  const message = (error as { message?: unknown }).message;
+  if (typeof message !== "string") return `${prefix}no message`;
+  return `${prefix}${message.split("\n")[0].slice(0, 200)}`;
 }
 
 export async function withRpcRetry<T>(
@@ -112,7 +117,7 @@ export async function withRpcRetry<T>(
     } catch (error) {
       if (!isTransientRpcError(error) || attempt >= attempts) throw error;
       console.warn(
-        `Transient RPC error (attempt ${attempt}/${attempts}), retrying in ${delayMs}ms`,
+        `Transient RPC error (attempt ${attempt}/${attempts}): ${errorSummary(error)}, retrying in ${delayMs}ms`,
       );
       await sleep(delayMs);
       delayMs *= 2;
@@ -121,15 +126,13 @@ export async function withRpcRetry<T>(
 }
 
 /**
- * Runs `run` against each endpoint in order, failing over to the next one
- * when the current one keeps returning transient RPC errors or serves an RPC
- * spec version the client cannot speak. Non-transient errors are rethrown
- * immediately without trying further endpoints.
+ * Runs `run` against each configured endpoint in order, failing over to the
+ * next one when the current one keeps returning transient RPC errors or
+ * serves an RPC spec version the client cannot speak. Non-transient errors
+ * are rethrown immediately without trying further endpoints.
  *
- * Note: if a transaction was already broadcast on a failing endpoint (e.g.
- * the confirmation poll failed), failing over can broadcast it a second
- * time. The duplicate contract is inert (funding matches drops by root),
- * so availability is worth the trade-off.
+ * Keep broadcasts and their confirmation polls in separate failover calls:
+ * failing over a confirmation must never re-broadcast the transaction.
  */
 export async function withEndpointFailover<T>(
   urls: string[],
@@ -146,7 +149,7 @@ export async function withEndpointFailover<T>(
       lastError = error;
       if (!isFailoverError(error)) throw error;
       console.warn(
-        `Endpoint ${hostnameForLog(url)} keeps failing, failing over`,
+        `Endpoint ${hostnameForLog(url)} keeps failing (${errorSummary(error)}), failing over`,
       );
     }
   }
