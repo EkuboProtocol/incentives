@@ -113,6 +113,19 @@ function hostnameForLog(url: string): string {
   }
 }
 
+// One-line error summary for retry/failover warnings. The Sep 24 deploy
+// failure showed the primary node failing five times with no record of what
+// it actually returned, so the code, if any, is always logged now.
+function errorSummary(error: unknown): string {
+  if (typeof error !== "object" || error === null) return "unknown error";
+  const code = (error as { code?: unknown }).code;
+  const prefix =
+    typeof code === "number" || typeof code === "string" ? `${code}: ` : "";
+  const message = (error as { message?: unknown }).message;
+  if (typeof message !== "string") return `${prefix}no message`;
+  return `${prefix}${message.split("\n")[0].slice(0, 200)}`;
+}
+
 export async function withRpcRetry<T>(
   operation: () => Promise<T>,
   attempts: number = DEFAULT_ATTEMPTS,
@@ -124,7 +137,7 @@ export async function withRpcRetry<T>(
     } catch (error) {
       if (!isTransientRpcError(error) || attempt >= attempts) throw error;
       console.warn(
-        `Transient RPC error (attempt ${attempt}/${attempts}), retrying in ${delayMs}ms`,
+        `Transient RPC error (attempt ${attempt}/${attempts}): ${errorSummary(error)}, retrying in ${delayMs}ms`,
       );
       await sleep(delayMs);
       delayMs *= 2;
@@ -200,7 +213,7 @@ async function runEndpointsPass<T>(
       if (!isFailoverError(error)) throw error;
       if (isTransientRpcError(error)) sawTransientError = true;
       console.warn(
-        `Endpoint ${hostnameForLog(url)} keeps failing, failing over`,
+        `Endpoint ${hostnameForLog(url)} keeps failing (${errorSummary(error)}), failing over`,
       );
     }
   }
