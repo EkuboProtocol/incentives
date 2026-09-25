@@ -242,9 +242,12 @@ ORDER BY di.drop_id
       constructorCalldata,
     );
 
-    const deployResponse = await withEndpointFailover(nodeUrls, async (url) => {
-      const { provider, account } = createDeployer(url);
-      const response = await withRpcRetry(() =>
+    // Broadcast and confirmation use separate failover passes so that a
+    // failing confirmation poll retries the wait instead of deploying a
+    // duplicate contract.
+    const deployResponse = await withEndpointFailover(nodeUrls, (url) => {
+      const { account } = createDeployer(url);
+      return withRpcRetry(() =>
         account.deployContract(
           {
             classHash: airdropClassHash,
@@ -253,12 +256,14 @@ ORDER BY di.drop_id
           DEPLOY_DETAILS,
         ),
       );
-      await withRpcRetry(() =>
-        provider.waitForTransaction(response.transaction_hash, {
+    });
+    await withEndpointFailover(nodeUrls, (url) => {
+      const { provider } = createDeployer(url);
+      return withRpcRetry(() =>
+        provider.waitForTransaction(deployResponse.transaction_hash, {
           retryInterval: DEPLOY_DETAILS.retryInterval,
         }),
       );
-      return response;
     });
 
     console.log("Deployed airdrop");

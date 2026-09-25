@@ -7,6 +7,13 @@
  * the operation fails over to the next configured endpoint. Endpoints may
  * also serve different RPC spec versions (0.9 vs 0.10), so a node whose spec
  * the client cannot speak is skipped the same way.
+ *
+ * Later a deploy failed with every endpoint exhausted at once (`-32029: Too
+ * Many Requests` on the primary and on the keyless public fallback), so
+ * failover now makes several passes over the endpoint list with a growing
+ * wait between passes: rate-limit windows usually clear within minutes,
+ * while a pass that fails without any transient error (e.g. unsupported RPC
+ * spec everywhere) still stops immediately.
  */
 
 const TRANSIENT_RPC_CODES = new Set([-32001, -32029]);
@@ -21,6 +28,11 @@ const TRANSIENT_MESSAGE_FRAGMENTS = [
 ];
 const DEFAULT_ATTEMPTS = 5;
 const DEFAULT_INITIAL_DELAY_MS = 2000;
+// Full passes over the endpoint list before giving up. One pass is ~30s of
+// retries per endpoint, so three passes ride out rate-limit windows of a few
+// minutes without burning much runner time.
+const DEFAULT_ROUNDS = 3;
+const DEFAULT_ROUND_BASE_DELAY_MS = 60_000;
 const UNSUPPORTED_SPEC_MESSAGE =
   "specification version is not supported by this library";
 
@@ -126,29 +138,98 @@ export async function withRpcRetry<T>(
  * spec version the client cannot speak. Non-transient errors are rethrown
  * immediately without trying further endpoints.
  *
- * Note: if a transaction was already broadcast on a failing endpoint (e.g.
- * the confirmation poll failed), failing over can broadcast it a second
- * time. The duplicate contract is inert (funding matches drops by root),
- * so availability is worth the trade-off.
+ * When every endpoint is exhausted by transient errors (e.g. `-32029` rate
+ * limits on all of them at once), the whole list is retried for a few more
+ * passes with a growing wait between passes instead of failing the run.
+ *
+ * Keep broadcasts and their confirmation polls in separate failover calls:
+ * failing over a confirmation must never re-broadcast the transaction.
  */
-export async function withEndpointFailover<T>(
+export interface FailoverOptions {
+  /** Full passes over the endpoint list before giving up. Default 3. */
+  rounds?: number;
+  /** Base wait between passes; doubles each pass with jitter. Default 60s. */
+  baseDelayMs?: number;
+  /** Overridable for tests. */
+  sleep?: (ms: number) => Promise<void>;
+}
+
+function roundDelayMs(baseDelayMs: number, round: number): number {
+  const jitter = 0.8 + Math.random() * 0.4;
+  return Math.round(baseDelayMs * 2 ** (round - 1) * jitter);
+}
+
+function logEndpoint(
+  url: string,
+  endpointCount: number,
+  round: number,
+  rounds: number,
+): void {
+  if (endpointCount > 1 || round > 1) {
+    const pass = round > 1 ? ` (pass ${round}/${rounds})` : "";
+    console.log(`Using Starknet RPC ${hostnameForLog(url)}${pass}`);
+  }
+}
+
+interface PassOutcome<T> {
+  succeeded: boolean;
+  value?: T;
+  sawTransientError: boolean;
+  lastError: unknown;
+}
+
+async function runEndpointsPass<T>(
   urls: string[],
   run: (nodeUrl: string) => Promise<T>,
-): Promise<T> {
+  round: number,
+  rounds: number,
+): Promise<PassOutcome<T>> {
+  let sawTransientError = false;
   let lastError: unknown = null;
   for (const url of urls) {
     try {
-      if (urls.length > 1) {
-        console.log(`Using Starknet RPC ${hostnameForLog(url)}`);
-      }
-      return await run(url);
+      logEndpoint(url, urls.length, round, rounds);
+      return {
+        succeeded: true,
+        value: await run(url),
+        sawTransientError,
+        lastError,
+      };
     } catch (error) {
       lastError = error;
       if (!isFailoverError(error)) throw error;
+      if (isTransientRpcError(error)) sawTransientError = true;
       console.warn(
         `Endpoint ${hostnameForLog(url)} keeps failing, failing over`,
       );
     }
+  }
+  return { succeeded: false, sawTransientError, lastError };
+}
+
+export async function withEndpointFailover<T>(
+  urls: string[],
+  run: (nodeUrl: string) => Promise<T>,
+  options: FailoverOptions = {},
+): Promise<T> {
+  const {
+    rounds = DEFAULT_ROUNDS,
+    baseDelayMs = DEFAULT_ROUND_BASE_DELAY_MS,
+    sleep: sleepFn = sleep,
+  } = options;
+  let lastError: unknown = null;
+  for (let round = 1; ; round += 1) {
+    const pass = await runEndpointsPass(urls, run, round, rounds);
+    if (pass.succeeded) return pass.value as T;
+    lastError = pass.lastError;
+    // A pass with no transient error (e.g. an unsupported RPC spec on every
+    // endpoint) will not heal with time, so stop instead of waiting.
+    if (!pass.sawTransientError || round >= rounds) break;
+    const delayMs = roundDelayMs(baseDelayMs, round);
+    console.warn(
+      `All Starknet RPC endpoints exhausted (pass ${round}/${rounds}), retrying in ${Math.round(delayMs / 1000)}s`,
+    );
+    await sleepFn(delayMs);
   }
   throw lastError;
 }
