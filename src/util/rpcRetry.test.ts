@@ -16,61 +16,24 @@ function specError(): Error {
   );
 }
 
-const noSleep = async (_ms: number): Promise<void> => {};
-
 describe(withEndpointFailover, () => {
   it("fails over to the next endpoint", async () => {
     const seen: string[] = [];
-    const result = await withEndpointFailover(
-      ["a", "b"],
-      async (url) => {
-        seen.push(url);
-        if (url === "a") throw transientError();
-        return "ok";
-      },
-      { sleep: noSleep },
-    );
+    const result = await withEndpointFailover(["a", "b"], async (url) => {
+      seen.push(url);
+      if (url === "a") throw transientError();
+      return "ok";
+    });
     expect(result).toBe("ok");
     expect(seen).toEqual(["a", "b"]);
   });
 
-  it("makes several passes when every endpoint is transiently limited", async () => {
-    let calls = 0;
-    const sleeps: number[] = [];
+  it("throws the last error when every endpoint fails", async () => {
     await expect(
-      withEndpointFailover(
-        ["a", "b"],
-        async () => {
-          calls += 1;
-          throw transientError();
-        },
-        {
-          rounds: 3,
-          baseDelayMs: 1000,
-          sleep: async (ms) => {
-            sleeps.push(ms);
-          },
-        },
-      ),
+      withEndpointFailover(["a", "b"], async () => {
+        throw transientError();
+      }),
     ).rejects.toThrow("Too Many Requests");
-    // 2 endpoints x 3 passes, with a wait between passes.
-    expect(calls).toBe(6);
-    expect(sleeps).toHaveLength(2);
-  });
-
-  it("stops after one pass when no error is transient", async () => {
-    let calls = 0;
-    await expect(
-      withEndpointFailover(
-        ["a", "b"],
-        async () => {
-          calls += 1;
-          throw specError();
-        },
-        { rounds: 3, sleep: noSleep },
-      ),
-    ).rejects.toThrow("specification version");
-    expect(calls).toBe(2);
   });
 
   it("rethrows non-failover errors without trying further endpoints", async () => {
@@ -82,6 +45,17 @@ describe(withEndpointFailover, () => {
       }),
     ).rejects.toThrow("boom");
     expect(calls).toBe(1);
+  });
+
+  it("fails over on unsupported RPC spec", async () => {
+    const seen: string[] = [];
+    const result = await withEndpointFailover(["a", "b"], async (url) => {
+      seen.push(url);
+      if (url === "a") throw specError();
+      return "ok";
+    });
+    expect(result).toBe("ok");
+    expect(seen).toEqual(["a", "b"]);
   });
 });
 
