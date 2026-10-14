@@ -1,0 +1,23 @@
+{
+  "src/generateDrop.ts": {
+    "typescript(restrict-template-expressions)": {
+      "count": 2
+    }
+  },
+  "src/util/postgres.ts": {
+    "typescript(no-base-to-string)": {
+      "count": 1
+    },
+    "typescript(restrict-template-expressions)": {
+      "count": 1
+    }
+  },
+  "src/util/rpcRetry.test.ts": {
+    "typescript(await-thenable)": {
+      "count": 3
+    },
+    "typescript(no-misused-promises)": {
+      "count": 2
+    }
+  }
+}

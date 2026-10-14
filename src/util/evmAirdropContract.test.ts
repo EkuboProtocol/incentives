@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { floatToRawValue } from "./floatToRawValue.js";
 import { EVM_AIRDROP_CONTRACT_OPTIONS } from "./evmAirdropContract.js";
 
