@@ -1,6 +1,7 @@
 # AGENTS.md
 
 ## Checks
+
 - Run `bun run format:check`, `bun run lint`, `bun run typecheck` and `bun run test`
   before committing (`bun run format` fixes formatting). CI runs all four on every
   push and pull request.
@@ -11,6 +12,7 @@
 - Formatting is oxfmt (`.oxfmtrc.json`).
 
 ## Lint and complexity policy
+
 - Lint is oxlint (`.oxlintrc.json`), run through `scripts/lint.ts`. It enforces
   `complexity`, capped at 10 per function (the repo is clean at that threshold), and
   the type-aware rules from typescript-eslint's recommended-type-checked set, which

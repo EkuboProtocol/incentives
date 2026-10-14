@@ -4,14 +4,8 @@
     "typeAware": true,
     "reportUnusedDisableDirectives": "error"
   },
-  "ignorePatterns": [
-    "node_modules/**",
-    "dist/**",
-    "build/**"
-  ],
-  "plugins": [
-    "typescript"
-  ],
+  "ignorePatterns": ["node_modules/**", "dist/**", "build/**"],
+  "plugins": ["typescript"],
   "categories": {
     "correctness": "off"
   },
@@ -36,15 +30,9 @@
   },
   "overrides": [
     {
-      "files": [
-        "**/*.ts",
-        "**/*.tsx"
-      ],
+      "files": ["**/*.ts", "**/*.tsx"],
       "rules": {
-        "complexity": [
-          "error",
-          10
-        ]
+        "complexity": ["error", 10]
       }
     }
   ]
