@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "ESNext",
+    "lib": ["ESNext"],
+    "module": "nodenext",
+    "moduleResolution": "NodeNext",
+    "types": ["bun"],
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    // Not yet strict: the scripts read environment variables without
+    // checking that they are set. Tighten in a change of its own.
+    "strict": false
+  },
+  "include": ["src"]
+}

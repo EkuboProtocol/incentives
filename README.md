@@ -59,19 +59,26 @@ The workflow can be triggered manually via GitHub Actions. It will automatically
 ### Setup
 
 ```bash
-npm install
+bun install
 ```
 
 ### Testing
 
 ```bash
-npm test
+bun run test
 ```
 
 ### Formatting
 
 ```bash
-npm run format
+bun run format
+```
+
+### Lint and types
+
+```bash
+bun run lint
+bun run typecheck
 ```
 
 ## Database Schema

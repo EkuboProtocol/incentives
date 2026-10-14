@@ -22,5 +22,7 @@ export function fetchEkuboBtcFiData(
   const params = new URLSearchParams();
   params.set("page", page.toString());
   params.set("size", size.toString());
-  return fetch(`${baseApiUrl}?${params.toString()}`).then((r) => r.json());
+  return fetch(`${baseApiUrl}?${params.toString()}`).then(
+    (r) => r.json() as ReturnType<typeof fetchEkuboBtcFiData>,
+  );
 }
