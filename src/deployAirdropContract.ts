@@ -8,11 +8,9 @@ import {
   withRpcRetry,
 } from "./util/rpcRetry.js";
 
-// Environment variables for Telegram
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-// Starknet deployment configuration
 const accountAddress = process.env.ACCOUNT_ADDRESS;
 const privateKey = process.env.PRIVATE_KEY;
 
@@ -49,7 +47,6 @@ function createDeployer(nodeUrl: string): {
 const airdropClassHash =
   "0x01cb5e128a81be492ee7b78cf4ba4849cb35f311508e13a558755f4549839f14";
 
-// Initialize Telegram bot if credentials are provided
 const telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, {
   polling: false,
 });
@@ -67,16 +64,10 @@ try {
   );
 }
 
-/**
- * Escapes MarkdownV2 special characters to prevent parsing errors
- */
 function escapeMarkdownV2(text: string): string {
   return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, "\\$&");
 }
 
-/**
- * Formats a number with 12 significant figures, rounded up
- */
 function formatWithSignificantFigures(
   value: bigint,
   decimals: number,
@@ -84,21 +75,16 @@ function formatWithSignificantFigures(
 ): string {
   if (value === 0n) return "0";
 
-  // Convert BigInt to number with decimals
   const valueNum = Number(value) / Math.pow(10, decimals);
 
-  // Calculate the order of magnitude
   const magnitude = Math.floor(Math.log10(Math.abs(valueNum)));
 
-  // Calculate decimal places needed for sigFigs significant figures
   // Clamp to 0-20 to avoid RangeError in toLocaleString
   const decimalPlaces = Math.min(20, Math.max(0, sigFigs - magnitude - 1));
 
-  // Round up
   const multiplier = Math.pow(10, decimalPlaces);
   const rounded = Math.ceil(valueNum * multiplier) / multiplier;
 
-  // Format with thousand separators
   return rounded.toLocaleString("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: decimalPlaces,
@@ -123,22 +109,16 @@ interface DropInfo {
   max_amount: string;
 }
 
-/**
- * Sends a Telegram message about the deployed contract
- */
 async function sendTelegramMessage(
   dropInfo: DropInfo,
   contractAddress: string,
 ): Promise<void> {
-  // Statistics are computed in SQL (avg and median are numeric, max is already bigint)
   const avgAmount = BigInt(Math.floor(Number(dropInfo.avg_amount)));
   const medianAmount = BigInt(Math.floor(Number(dropInfo.median_amount)));
   const maxAmount = BigInt(dropInfo.max_amount);
 
-  // Escape campaign names to prevent MarkdownV2 parsing issues
   const escapedCampaigns = escapeMarkdownV2(dropInfo.campaign_name);
 
-  // Convert dates to Date objects if they're strings (postgres returns timestamptz as strings)
   const startDate =
     dropInfo.min_start_time instanceof Date
       ? dropInfo.min_start_time
@@ -175,7 +155,6 @@ const sql = postgres({
 });
 
 try {
-  // Query for all generated drops that haven't been deployed yet
   const drops = await sql<DropInfo[]>`
 WITH drop_info AS (SELECT gd.id                                                    AS drop_id,
                           gd.root,

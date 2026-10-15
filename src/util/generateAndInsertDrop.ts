@@ -25,7 +25,6 @@ export async function generateAndInsertClaimsDrop(
     }),
   );
 
-  // Example usage:
   const { root, layers } = constructMerkleTree(
     claimsWithHashes.map(({ hash }) => hash),
     options.siblingHashFunction,

@@ -93,9 +93,6 @@ function hostnameForLog(url: string): string {
   }
 }
 
-// One-line error summary for retry/failover warnings. The Sep 24 deploy
-// failure showed the primary node failing five times with no record of what
-// it actually returned, so the code, if any, is always logged now.
 function errorSummary(error: unknown): string {
   if (typeof error !== "object" || error === null) return "unknown error";
   const code = (error as { code?: unknown }).code;

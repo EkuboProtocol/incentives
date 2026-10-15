@@ -17,7 +17,6 @@ function claimHashFunction(claim: Claim): bigint {
   );
 }
 
-// Updated hash function using pedersen_from_hex, assuming it's implemented correctly
 function siblingHashFunction(a: bigint, b: bigint): bigint {
   if (a < b) {
     return BigInt(
