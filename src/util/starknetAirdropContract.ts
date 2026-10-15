@@ -20,7 +20,6 @@ function claimHashFunction(claim: Claim): bigint {
   );
 }
 
-// Updated hash function using pedersen_from_hex, assuming it's implemented correctly
 function siblingHashFunction(left: bigint, right: bigint): bigint {
   if (left < right) {
     return BigInt(
